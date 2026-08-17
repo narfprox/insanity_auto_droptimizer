@@ -54,9 +54,10 @@ hasta 15 minutos. Se puede bajar en la opción 4 o con `--concurrency 1`.
 ### Versión de SimulationCraft
 
 Raidbots ofrece `weekly` (build semanal estable, su defecto), `nightly` (build del día) y
-`latest` (último commit). La herramienta la fija **siempre de forma explícita** para que no
-dependa de lo que quedara elegido la vez anterior; por defecto usa `weekly`. Se cambia en la
-opción 4 del menú o con `--simc-version nightly`.
+`latest` (último commit). Esta herramienta usa **`nightly` por defecto**, para que los sims
+salgan con el modelo más al día, y la fija **siempre de forma explícita** para que no dependa
+de lo que quedara elegido la vez anterior. Se cambia en la opción 4 del menú o con
+`--simc-version weekly`.
 
 ### Subir a WoWUtils desde el propio programa
 
@@ -94,7 +95,7 @@ npm run build                                    # genera dist/Droptimizer.exe
 | `--dry-run` | Configura todo pero **no** lanza los sims |
 | `--no-wait` | Envía los sims y devuelve las URLs sin esperar a que terminen |
 | `--concurrency <n\|auto>` | Sims simultáneos. `auto` (defecto) = todos a la vez, hasta 5 |
-| `--simc-version <v>` | `weekly` (defecto), `nightly` o `latest` |
+| `--simc-version <v>` | `nightly` (defecto), `weekly` o `latest` |
 | `--import` | Al terminar, sube las URLs a WoWUtils |
 | `--timeout-min <n>` | Minutos máximos de espera por sim (por defecto 25) |
 

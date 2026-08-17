@@ -159,7 +159,7 @@ MENU
   1) Pegar mi SimC y lanzar        <- lo normal
   2) Lanzar los SimC guardados     <- para varios personajes de golpe
   3) Elegir que perfiles lanzar    <- Normal / HC / Mythic / M+ / Vault
-  4) Opciones                      <- sims en paralelo y version de SimC
+  4) Opciones                      <- sims en paralelo y version de SimC (nightly)
   5) Subir a WoWUtils              <- sube las URLs al grupo
   6) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
   0) Salir

@@ -421,11 +421,11 @@ export async function loadCharacter(page, simc) {
 
 /**
  * Version de SimulationCraft con la que corre el sim (panel "Simulation Options").
- * weekly = build semanal estable (el defecto de Raidbots), nightly = build del dia,
- * latest = ultimo commit. Se fija siempre: el perfil de navegador recuerda la
+ * nightly (nuestro defecto) = build del dia, lo mas al dia; weekly = build semanal
+ * estable, que es el defecto de Raidbots; latest = ultimo commit. Se fija siempre: el perfil de navegador recuerda la
  * eleccion anterior y no queremos que dependa de lo que se hizo la vez pasada.
  */
-export async function setSimcVersion(page, version = 'weekly') {
+export async function setSimcVersion(page, version = 'nightly') {
   const select = page.locator('select[name="simcVersion"]')
   if (!(await select.count())) {
     // El panel viene plegado; hay que abrirlo para que exista el <select>.
@@ -588,7 +588,7 @@ export function buildTasks(characters, profiles) {
 }
 
 /** Lanza las tareas con N pestañas en paralelo. Devuelve las entradas de resultado. */
-export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun = false, noWait = false, timeoutMin = 25, simcVersion = 'weekly' } = {}) {
+export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun = false, noWait = false, timeoutMin = 25, simcVersion = 'nightly' } = {}) {
   const results = tasks.map((t) => t.entry)
   let next = 0
 

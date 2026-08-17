@@ -101,10 +101,10 @@ function resolveWorkers(taskCount) {
   return Math.max(1, Math.min(workers, taskCount))
 }
 
-/** weekly (defecto de Raidbots) / nightly / latest. */
+/** nightly por defecto; weekly es el defecto de Raidbots, latest el ultimo commit. */
 function resolveSimcVersion() {
   const raw = typeof opts.simcVersion === 'string' ? opts.simcVersion : loadConfig().simcVersion
-  return ['weekly', 'nightly', 'latest'].includes(raw) ? raw : 'weekly'
+  return ['weekly', 'nightly', 'latest'].includes(raw) ? raw : 'nightly'
 }
 
 /** Lanza una tanda y escribe los resultados. */
@@ -312,12 +312,12 @@ async function concurrencyMenu() {
 async function simcVersionMenu() {
   const config = loadConfig()
   log('\n--- Version de SimulationCraft ---')
-  log('  1) Weekly   build semanal estable (lo que usa Raidbots por defecto)')
-  log('  2) Nightly  build del dia: mas al dia, con alguna posibilidad de bugs')
+  log('  1) Nightly  build del dia, lo mas al dia — por defecto')
+  log('  2) Weekly   build semanal estable (el defecto de Raidbots)')
   log('  3) Latest   ultimo commit')
   log('  0) Volver sin cambiar')
   const opcion = await prompt('> ')
-  const valores = { 1: 'weekly', 2: 'nightly', 3: 'latest' }
+  const valores = { 1: 'nightly', 2: 'weekly', 3: 'latest' }
   const elegido = valores[opcion]
   if (!elegido) return
   saveConfig({ ...config, simcVersion: elegido })
@@ -329,7 +329,7 @@ async function optionsMenu() {
     const config = loadConfig()
     log('\n--- Opciones ---')
     log(`Sims a la vez:    ${(config.concurrency || 'auto') === 'auto' ? 'todos a la vez (hasta 5)' : config.concurrency}`)
-    log(`Version de SimC:  ${config.simcVersion || 'weekly'}`)
+    log(`Version de SimC:  ${config.simcVersion || 'nightly'}`)
     log('  1) Cambiar cuantos sims a la vez')
     log('  2) Cambiar la version de SimC')
     log('  0) Volver')
