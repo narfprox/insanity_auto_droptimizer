@@ -85,13 +85,13 @@ export const PAGINA = /* html */ `<!doctype html>
 
 <main>
   <section class="panel">
-    <h2>1 · Tu personaje</h2>
+    <h2>1 · El SimC xurrita</h2>
     <textarea id="simc" placeholder="Escribe /simc en el juego, copia el texto y pégalo aquí (Ctrl+V)"></textarea>
     <div class="personaje" id="personaje"></div>
   </section>
 
   <section class="panel">
-    <h2>2 · Qué lanzar</h2>
+    <h2>2 · ¿Qué quiere jefe?</h2>
     <div id="perfiles"></div>
     <div class="fila">
       <span>En paralelo</span>
@@ -103,11 +103,10 @@ export const PAGINA = /* html */ `<!doctype html>
       </select>
     </div>
     <div class="fila">
-      <span>Versión SimC</span>
+      <span>Versión de Raidbots</span>
       <select id="simcVersion">
         <option value="nightly">Nightly (build del día)</option>
         <option value="weekly">Weekly (semanal estable)</option>
-        <option value="latest">Latest (último commit)</option>
       </select>
     </div>
     <button id="lanzar">Lanzar droptimizers</button>
