@@ -38,7 +38,14 @@ const CLASSES = [
 
 // ---------------------------------------------------------------- utils
 
-export const log = (...m) => console.log(...m)
+/*
+ * Todo el progreso sale por aqui. La consola es el destino por defecto, pero la
+ * interfaz grafica lo redirige a su propio panel con setLogger().
+ */
+let sink = (...m) => console.log(...m)
+export const log = (...m) => sink(...m)
+export function setLogger(fn) { sink = fn || ((...m) => console.log(...m)) }
+
 export const stamp = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 

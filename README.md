@@ -40,6 +40,22 @@ Perfiles: 5 de 5 (raid-normal, raid-heroic, raid-mythic, mplus-10, mplus-vault-1
   0) Salir
 ```
 
+### Interfaz con botones
+
+`Droptimizer.exe --ui` (o la opción **7** del menú) abre una **ventana de aplicación** con
+botones: pegas el SimC en un cuadro de texto, marcas los perfiles, le das a *Lanzar* y ves el
+progreso en vivo y las URLs como enlaces, con botones para copiarlas todas o subirlas a
+WoWUtils.
+
+No es una página de internet: el programa levanta un servidor en `127.0.0.1` con un puerto al
+azar y abre la ventana con el modo `--app` del navegador, sin barra de direcciones ni pestañas
+y con su propio icono en la barra de tareas. Se aprovecha el motor del navegador que ya tienes
+en vez de arrastrar uno propio (Electron serían +150 MB de ZIP). Al cerrar la ventana se cierra
+el programa.
+
+Además, pegando el SimC en la ventana **ya no hace falta leer el portapapeles**, que era lo
+único que el programa lanzaba fuera de sí mismo.
+
 ### Sims en paralelo (por defecto)
 
 Cada sim va en su propia pestaña y **de fábrica salen todos a la vez**, con tope 5. Si solo

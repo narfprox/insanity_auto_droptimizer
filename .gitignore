@@ -7,3 +7,5 @@ config.json
 raidbots-account.json
 .env
 simc/*.simc
+.ui-profile/
+ventanas.log

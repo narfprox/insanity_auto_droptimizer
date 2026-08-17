@@ -44,6 +44,7 @@ const opts = {
   concurrency: flag('concurrency'),
   import: has('import'),
   simcVersion: flag('simc-version'),
+  ui: has('ui'),
   timeoutMin: Number(flag('timeout-min', 25)),
   help: has('help') || has('h'),
   // Al abrirlo con doble clic no hay argumentos: se abre el menu.
@@ -367,6 +368,7 @@ async function mainMenu(session) {
     log('  3) Elegir que perfiles lanzar')
     log('  4) Opciones (sims en paralelo, version de SimC)')
     log('  5) Subir a WoWUtils')
+    log('  7) Abrir la interfaz con botones')
     log('  6) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)')
     log('  0) Salir')
     const opcion = await prompt('> ')
@@ -388,6 +390,11 @@ async function mainMenu(session) {
       await optionsMenu()
     } else if (opcion === '5') {
       await wowutilsMenu()
+    } else if (opcion === '7') {
+      const { arrancarUI } = await import('./ui.mjs')
+      log('\nAbriendo la ventana... (el programa se cierra al cerrarla)')
+      await arrancarUI({})
+      return
     } else if (opcion === '6') {
       session = await withBrowser(({ context }) => accountMenu(context, session))
     } else if (opcion === '0' || opcion === '') {
@@ -441,6 +448,13 @@ for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
 
 async function main() {
   fs.mkdirSync(opts.out, { recursive: true })
+
+  // Interfaz grafica: ventana propia con botones, sin consola de por medio.
+  if (opts.ui) {
+    const { arrancarUI } = await import('./ui.mjs')
+    await arrancarUI({})
+    return 0
+  }
 
   // --login: entrar a mano en el navegador (por si falla el login por API).
   if (opts.login) {

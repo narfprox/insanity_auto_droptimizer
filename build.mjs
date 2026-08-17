@@ -125,6 +125,8 @@ await inject(EXE, 'NODE_SEA_BLOB', fs.readFileSync(path.join(BUILD, 'sea-prep.bl
 // 4. Extras que acompañan al .exe.
 console.log('4/4  extras...')
 fs.copyFileSync(path.join(HERE, 'profiles.json'), path.join(DIST, 'profiles.json'))
+// El icono de la ventana de la interfaz grafica.
+if (logo) fs.copyFileSync(logo, path.join(DIST, 'pulpo.png'))
 
 // La cuenta compartida viaja como fichero al lado del .exe (no dentro del binario):
 // asi se cambia la contraseña sin recompilar nada.
@@ -154,6 +156,13 @@ cambia la contraseña: opcion 4 del menu (Cuenta de Raidbots).
 Si prefieres ir en anonimo, deja el email en blanco y pulsa Enter: funciona
 igual, solo que la cola de Raidbots es mas lenta.
 
+INTERFAZ CON BOTONES
+--------------------
+Si prefieres botones a la consola, elige la opcion 7 del menu: se abre una
+ventana donde pegas el SimC, marcas que perfiles quieres y le das a lanzar. Las
+URLs salen como enlaces, con un boton para copiarlas todas y otro para subirlas
+a WoWUtils. Al cerrar la ventana se cierra el programa.
+
 MENU
 ----
   1) Pegar mi SimC y lanzar        <- lo normal
@@ -162,6 +171,7 @@ MENU
   4) Opciones                      <- sims en paralelo y version de SimC (nightly)
   5) Subir a WoWUtils              <- sube las URLs al grupo
   6) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
+  7) Abrir la interfaz con botones <- la ventana con botones
   0) Salir
 
 SIMS EN PARALELO
