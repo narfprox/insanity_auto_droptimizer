@@ -15,7 +15,7 @@ import {
   loadConfig, saveConfig, loadProfiles,
   launchContext, describeSession, login, logout, ensureLogin, readAccount,
   readWowutils, saveWowutils, checkWowutils, importDroptimizers, importableFrom,
-  buildTasks, runTasks, writeResults,
+  latestResultsFile, buildTasks, runTasks, writeResults,
 } from './lib.mjs'
 import { PAGINA } from './ui-page.mjs'
 
@@ -25,7 +25,15 @@ const MAX_WORKERS = 5
 
 const clientes = new Set()   // conexiones SSE abiertas
 let corriendo = false
-let ultimosResultados = []
+
+// Al abrir la ventana se recupera la ultima tanda de disco: asi los enlaces
+// siguen ahi despues de cerrar el programa, y se pueden subir a WoWUtils.
+let ultimosResultados = (() => {
+  try {
+    const fichero = latestResultsFile(path.join(HERE, 'out'))
+    return fichero ? JSON.parse(fs.readFileSync(fichero, 'utf8')) : []
+  } catch { return [] }
+})()
 
 const emitir = (tipo, datos) => {
   const mensaje = `data: ${JSON.stringify({ tipo, ...datos })}\n\n`
@@ -48,7 +56,10 @@ async function conNavegador(fn) {
 async function estado() {
   const config = loadConfig()
   const perfiles = loadProfiles()
-  const activos = config.profiles?.length ? config.profiles : perfiles.map((p) => p.key)
+  // Sin nada guardado manda el perfil: los que traen "default": false salen sin marcar.
+  const activos = config.profiles?.length
+    ? config.profiles
+    : perfiles.filter((p) => p.default !== false).map((p) => p.key)
   const sesion = await conNavegador(async ({ context }) => ensureLogin(context, await describeSession(context)))
   return {
     sesion: { texto: sesion.text, anonima: sesion.anonymous },

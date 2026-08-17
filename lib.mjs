@@ -360,8 +360,11 @@ export async function describeSession(context) {
     if (!user || (!user.username && !user.email)) return { anonymous: true, text: 'anonima (sin login) — cola gratuita' }
     const who = user.username || user.email
     const tier = user.patreonTitle ? `premium: ${user.patreonTitle}` : 'sin premium'
-    const limit = user.concurrentSimLimit || 1
-    return { anonymous: false, user: who, concurrentSimLimit: limit, text: `${who} — ${tier} — ${limit} sim(s) a la vez` }
+    // concurrentSimLimit solo aparece cuando un admin de Raidbots impone un tope
+    // a esa cuenta; no es el cupo normal, asi que solo se enseña si lo hay.
+    const limit = user.concurrentSimLimit
+    const tope = limit ? ` — tope de ${limit} sim(s) a la vez` : ''
+    return { anonymous: false, user: who, concurrentSimLimit: limit, text: `${who} — ${tier}${tope}` }
   } catch {
     return { anonymous: true, text: 'no se pudo comprobar (¿sin internet?)' }
   }

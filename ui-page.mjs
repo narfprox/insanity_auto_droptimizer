@@ -63,6 +63,7 @@ export const PAGINA = /* html */ `<!doctype html>
   .res .et { flex: 1; }
   .res a { color: var(--morado); text-decoration: none; font: 12px Consolas, monospace; }
   .res a:hover { text-decoration: underline; }
+  button.mini { padding: 3px 10px; font-size: 12px; border-radius: 6px; }
   .pin { font-size: 11px; padding: 2px 7px; border-radius: 20px; background: #2c2a38; color: var(--suave); }
   .pin.ok { background: rgba(63,185,80,.15); color: var(--verde); }
   .pin.mal { background: rgba(248,81,73,.15); color: var(--rojo); }
@@ -105,8 +106,8 @@ export const PAGINA = /* html */ `<!doctype html>
     <div class="fila">
       <span>Versión de Raidbots</span>
       <select id="simcVersion">
-        <option value="nightly">Nightly (build del día)</option>
-        <option value="weekly">Weekly (semanal estable)</option>
+        <option value="nightly">Nightly</option>
+        <option value="weekly">Weekly</option>
       </select>
     </div>
     <button id="lanzar">Lanzar droptimizers</button>
@@ -187,7 +188,10 @@ function pintarResultados(resultados) {
     const estado = r.state === 'complete' ? 'ok' : r.state === 'error' ? 'mal' : ''
     fila.innerHTML = '<span class="pin ' + estado + '">' + (r.state || '—') + '</span>'
       + '<span class="et">' + r.label + '</span>'
-      + (r.url ? '<a href="' + r.url + '" target="_blank">abrir report</a>' : '')
+      + (r.url
+        ? '<a href="' + r.url + '" target="_blank">abrir report</a>'
+          + '<button class="sec mini" data-url="' + r.url + '">copiar</button>'
+        : '')
     caja.appendChild(fila)
   }
 }
@@ -229,6 +233,15 @@ $('lanzar').onclick = async () => {
   $('consola').dataset.limpio = '0'
   await api('/api/lanzar', { simc: $('simc').value, perfiles })
 }
+
+// Copiar una URL suelta: el boton dice "copiada" un segundo y vuelve a lo suyo.
+$('resultados').addEventListener('click', (ev) => {
+  const boton = ev.target.closest('button[data-url]')
+  if (!boton) return
+  navigator.clipboard.writeText(boton.dataset.url)
+  boton.textContent = 'copiada'
+  setTimeout(() => { boton.textContent = 'copiar' }, 1200)
+})
 
 $('btnCopiar').onclick = () => {
   if (!urls.length) return

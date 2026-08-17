@@ -67,9 +67,10 @@ function selectedProfiles() {
   const keys = typeof opts.profiles === 'string'
     ? opts.profiles.split(',').map((s) => s.trim())
     : loadConfig().profiles
-  if (!keys || !keys.length) return allProfiles
+  const porDefecto = allProfiles.filter((p) => p.default !== false)
+  if (!keys || !keys.length) return porDefecto
   const chosen = keys.map((k) => allProfiles.find((p) => p.key === k)).filter(Boolean)
-  return chosen.length ? chosen : allProfiles
+  return chosen.length ? chosen : porDefecto
 }
 
 function simcFilesFromDisk() {
@@ -199,7 +200,9 @@ async function simcFromClipboard() {
 
 async function profilesMenu() {
   const config = loadConfig()
-  const active = new Set((config.profiles && config.profiles.length ? config.profiles : allProfiles.map((p) => p.key)))
+  const active = new Set(config.profiles?.length
+    ? config.profiles
+    : allProfiles.filter((p) => p.default !== false).map((p) => p.key))
   while (true) {
     log('\n--- Perfiles a lanzar ---')
     allProfiles.forEach((p, i) => log(`  ${i + 1}) [${active.has(p.key) ? 'x' : ' '}] ${p.label}`))
