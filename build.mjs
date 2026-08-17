@@ -159,16 +159,25 @@ MENU
   1) Pegar mi SimC y lanzar        <- lo normal
   2) Lanzar los SimC guardados     <- para varios personajes de golpe
   3) Elegir que perfiles lanzar    <- Normal / HC / Mythic / M+ / Vault
-  4) Cuantos sims a la vez         <- ponlo en "todos a la vez" y tardas mucho menos
-  5) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
+  4) Opciones                      <- sims en paralelo y version de SimC
+  5) Subir a WoWUtils              <- sube las URLs al grupo
+  6) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
   0) Salir
 
 SIMS EN PARALELO
 ----------------
-Con la opcion 4 puedes lanzar los 5 perfiles a la vez en lugar de uno detras de
-otro. El limite lo pone Raidbots: una cuenta solo puede tener unos cuantos sims
-corriendo a la vez (1 si no tiene Premium). Si te pasas, no se pierde nada: esa
-pestaña espera su turno y entra cuando queda hueco.
+Por defecto se lanzan todos los perfiles a la vez (hasta 5), asi la tanda dura
+lo que dure el sim mas largo. El limite de verdad lo pone Raidbots: una cuenta
+solo puede tener unos cuantos sims corriendo a la vez. Si te pasas no se pierde
+nada, esa pestaña espera su turno y entra cuando queda hueco. En la opcion 4
+puedes bajarlo si prefieres ir mas suave.
+
+SUBIR A WOWUTILS
+----------------
+Al terminar te pregunta si quieres subir las URLs al grupo. La primera vez te
+pide la API key del grupo (Group settings -> API sharing) y el id del grupo, que
+sale en la URL de wowutils.com. Se guardan y ya no vuelve a preguntar.
+Tambien esta la opcion 5 del menu para subir la ultima tanda cuando quieras.
 
 REQUISITOS
 ----------

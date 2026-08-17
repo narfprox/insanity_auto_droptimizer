@@ -32,7 +32,7 @@
   {
     "key": "mplus-10",
     "label": "Mythic+ 10 — Hero 6/6",
-    "profileKey": "mplus",
+    "profileKey": "mplus-drops",
     "source": "Mythic+ Dungeons",
     "select": ["Mythic 10"],
     "upgrade": "max",

@@ -174,6 +174,123 @@ export function forgetAccount() {
   fs.rmSync(ACCOUNT_FILE, { force: true })
 }
 
+// ---------------------------------------------------------------- WoWUtils
+
+export const WOWUTILS_API = 'https://api.wowutils.com'
+export const WOWUTILS_FILE = path.join(HERE, 'wowutils-account.json')
+const COST_PER_IMPORT = 5
+
+/** Key + grupo de WoWUtils: variables de entorno o wowutils-account.json. */
+export function readWowutils() {
+  if (process.env.WOWUTILS_API_KEY && process.env.WOWUTILS_GROUP_ID) {
+    return { apiKey: process.env.WOWUTILS_API_KEY, groupId: process.env.WOWUTILS_GROUP_ID, from: 'variables de entorno' }
+  }
+  if (fs.existsSync(WOWUTILS_FILE)) {
+    try {
+      const { apiKey, groupId } = JSON.parse(fs.readFileSync(WOWUTILS_FILE, 'utf8'))
+      if (apiKey && groupId) return { apiKey, groupId, from: 'configuracion guardada' }
+    } catch { log('aviso: wowutils-account.json no es un JSON valido') }
+  }
+  return null
+}
+
+export function saveWowutils({ apiKey, groupId }) {
+  fs.writeFileSync(WOWUTILS_FILE, JSON.stringify({ apiKey, groupId }, null, 2))
+}
+
+export function forgetWowutils() {
+  fs.rmSync(WOWUTILS_FILE, { force: true })
+}
+
+/** Comprueba que la key vale y devuelve el nombre del grupo (cuesta 1 punto). */
+export async function checkWowutils({ apiKey, groupId }) {
+  try {
+    const res = await fetch(`${WOWUTILS_API}/v1/groups/${encodeURIComponent(groupId)}`, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    })
+    if (res.status === 401 || res.status === 403) return { ok: false, message: 'la API key no vale para ese grupo' }
+    if (res.status === 404) return { ok: false, message: 'ese grupo no existe (revisa el id)' }
+    if (!res.ok) return { ok: false, message: `HTTP ${res.status}` }
+    const body = await res.json()
+    const group = body?.data || body
+    return { ok: true, name: group?.name || groupId, remaining: res.headers.get('x-ratelimit-remaining') }
+  } catch (e) {
+    return { ok: false, message: e.message }
+  }
+}
+
+/**
+ * Sube droptimizers al grupo. Cada import cuesta 5 puntos del presupuesto por
+ * hora del grupo; si se agota, espera al reset en vez de encadenar 429.
+ */
+export async function importDroptimizers(items, { apiKey, groupId, dryRun = false }) {
+  const done = []
+  const failed = []
+
+  for (const item of items) {
+    const body = { url: item.url }
+    if (item.profileKey) body.profileKey = item.profileKey
+
+    if (dryRun) {
+      log(`[dry-run] POST /v1/groups/${groupId}/droptimizers ${JSON.stringify(body)}`)
+      done.push(item)
+      continue
+    }
+
+    let res = await fetch(`${WOWUTILS_API}/v1/groups/${encodeURIComponent(groupId)}/droptimizers`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    let text = await res.text()
+
+    // Si el profileKey no le gusta, se reintenta sin el: WoWUtils lo deduce del report.
+    if (!res.ok && body.profileKey && /profilekey/i.test(text)) {
+      res = await fetch(`${WOWUTILS_API}/v1/groups/${encodeURIComponent(groupId)}/droptimizers`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: item.url }),
+      })
+      text = await res.text()
+    }
+
+    const remaining = res.headers.get('x-ratelimit-remaining')
+    if (res.ok) {
+      done.push(item)
+      log(`  OK  ${item.character || '?'} · ${item.label || item.profileKey || ''}  (quedan ${remaining ?? '?'} pts)`)
+    } else {
+      failed.push({ ...item, error: `HTTP ${res.status}: ${text.slice(0, 200)}` })
+      log(`  !!  ${item.character || '?'} · ${item.label || ''} — HTTP ${res.status}: ${text.slice(0, 200)}`)
+    }
+
+    if (remaining !== null && Number(remaining) < COST_PER_IMPORT) {
+      const reset = Number(res.headers.get('x-ratelimit-reset') || 0) * 1000
+      const waitMs = Math.max(0, reset - Date.now()) + 2000
+      log(`  sin puntos: esperando ${Math.ceil(waitMs / 1000)}s al reset del grupo...`)
+      await sleep(waitMs)
+    } else {
+      await sleep(500)
+    }
+  }
+  return { done, failed }
+}
+
+/** Los droptimizers de un fichero de resultados que se pueden importar. */
+export function importableFrom(results) {
+  return results
+    .filter((r) => r.url && r.state === 'complete')
+    .map((r) => ({ url: r.url, profileKey: r.profileKey, character: r.character, label: r.label }))
+}
+
+/** El fichero out/droptimizers-*.json mas reciente. */
+export function latestResultsFile(outDir) {
+  if (!fs.existsSync(outDir)) return null
+  const files = fs.readdirSync(outDir)
+    .filter((f) => f.startsWith('droptimizers-') && f.endsWith('.json'))
+    .sort()
+  return files.length ? path.join(outDir, files[files.length - 1]) : null
+}
+
 // ---------------------------------------------------------------- navegador
 
 /** Usa el Edge/Chrome ya instalado: no hace falta descargar Chromium. */
@@ -300,6 +417,26 @@ export async function loadCharacter(page, simc) {
   // Ojo: el DOM pone "Sources"; las mayusculas son solo CSS.
   await page.getByText(/^sources$/i).first().waitFor({ state: 'visible', timeout: 60000 })
   await page.waitForTimeout(1500)
+}
+
+/**
+ * Version de SimulationCraft con la que corre el sim (panel "Simulation Options").
+ * weekly = build semanal estable (el defecto de Raidbots), nightly = build del dia,
+ * latest = ultimo commit. Se fija siempre: el perfil de navegador recuerda la
+ * eleccion anterior y no queremos que dependa de lo que se hizo la vez pasada.
+ */
+export async function setSimcVersion(page, version = 'weekly') {
+  const select = page.locator('select[name="simcVersion"]')
+  if (!(await select.count())) {
+    // El panel viene plegado; hay que abrirlo para que exista el <select>.
+    await page.getByText(/^Simulation Options/i).first().click()
+    await select.waitFor({ state: 'attached', timeout: 15000 })
+  }
+  await select.selectOption(version)
+  await page.waitForTimeout(300)
+  const applied = await select.inputValue()
+  if (applied !== version) throw new Error(`No se pudo poner SimC Version en "${version}" (quedo en "${applied}")`)
+  return applied
 }
 
 /** Aplica fuente + dificultad/nivel + "Upgrade up to" + casillas. */
@@ -439,6 +576,7 @@ export function buildTasks(characters, profiles) {
           url: null,
           state: null,
           upgradeLabel: null,
+          simcVersion: null,
           submittedAt: null,
           finishedAt: null,
           error: null,
@@ -450,7 +588,7 @@ export function buildTasks(characters, profiles) {
 }
 
 /** Lanza las tareas con N pestañas en paralelo. Devuelve las entradas de resultado. */
-export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun = false, noWait = false, timeoutMin = 25 } = {}) {
+export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun = false, noWait = false, timeoutMin = 25, simcVersion = 'weekly' } = {}) {
   const results = tasks.map((t) => t.entry)
   let next = 0
 
@@ -465,7 +603,8 @@ export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun 
         await loadCharacter(page, simc)
         const applied = await applyProfile(page, profile)
         entry.upgradeLabel = applied.upgradeLabel
-        log(`${tag} config: ${profile.source} / ${(profile.select || []).join(' / ')} / upgrade ${applied.upgradeLabel}`)
+        entry.simcVersion = await setSimcVersion(page, simcVersion)
+        log(`${tag} config: ${profile.source} / ${(profile.select || []).join(' / ')} / upgrade ${applied.upgradeLabel} / SimC ${entry.simcVersion}`)
 
         if (dryRun) { entry.state = 'dry-run'; continue }
 

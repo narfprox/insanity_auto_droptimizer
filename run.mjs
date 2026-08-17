@@ -17,6 +17,8 @@ import {
   log, prompt, promptHidden, parseSimc, simcFileName, readClipboard, looksLikeSimc,
   loadConfig, saveConfig, loadProfiles,
   readAccount, saveAccount, launchContext, describeSession, login, logout, ensureLogin,
+  readWowutils, saveWowutils, forgetWowutils, checkWowutils, importDroptimizers,
+  importableFrom, latestResultsFile,
   buildTasks, runTasks, writeResults,
 } from './lib.mjs'
 
@@ -40,6 +42,8 @@ const opts = {
   dryRun: has('dry-run'),
   noWait: has('no-wait'),
   concurrency: flag('concurrency'),
+  import: has('import'),
+  simcVersion: flag('simc-version'),
   timeoutMin: Number(flag('timeout-min', 25)),
   help: has('help') || has('h'),
   // Al abrirlo con doble clic no hay argumentos: se abre el menu.
@@ -82,23 +86,32 @@ function readCharacters(files) {
 }
 
 /**
- * Cuantas pestañas trabajan a la vez. "auto" = todas las tareas de golpe (con
- * tope 5): si la cuenta no da para tanto, Raidbots va rechazando y cada pestaña
- * espera su hueco, asi que el limite real lo marca Raidbots, no una config.
+ * Cuantas pestañas trabajan a la vez. Por defecto "auto": todas las tareas de
+ * golpe, con tope 5. Si solo hay 2 perfiles seleccionados, van esos 2 en
+ * paralelo. Si la cuenta no da para tanto, Raidbots va rechazando y cada
+ * pestaña espera su hueco: el limite real lo marca Raidbots, no una config.
  */
+const MAX_WORKERS = 5
+
 function resolveWorkers(taskCount) {
   const raw = typeof opts.concurrency === 'string' && opts.concurrency !== 'true'
     ? opts.concurrency
-    : loadConfig().concurrency || '1'
-  const workers = raw === 'auto' ? Math.min(taskCount, 5) : Math.max(1, Number(raw) || 1)
-  return Math.min(workers, taskCount)
+    : loadConfig().concurrency || 'auto'
+  const workers = raw === 'auto' ? MAX_WORKERS : Math.max(1, Number(raw) || 1)
+  return Math.max(1, Math.min(workers, taskCount))
+}
+
+/** weekly (defecto de Raidbots) / nightly / latest. */
+function resolveSimcVersion() {
+  const raw = typeof opts.simcVersion === 'string' ? opts.simcVersion : loadConfig().simcVersion
+  return ['weekly', 'nightly', 'latest'].includes(raw) ? raw : 'weekly'
 }
 
 /** Lanza una tanda y escribe los resultados. */
 async function launch(context, page, characters, profiles) {
   const tasks = buildTasks(characters, profiles)
   const workers = resolveWorkers(tasks.length)
-  log(`\n${tasks.length} sim(s), ${workers} en paralelo`)
+  log(`\n${tasks.length} sim(s), ${workers === 1 ? 'de uno en uno' : `${workers} en paralelo`}`)
   log('Esto tarda unos minutos. Puedes minimizar la ventana.\n')
 
   const results = await runTasks(context, page, tasks, {
@@ -106,6 +119,7 @@ async function launch(context, page, characters, profiles) {
     dryRun: opts.dryRun,
     noWait: opts.noWait,
     timeoutMin: opts.timeoutMin,
+    simcVersion: resolveSimcVersion(),
   })
   writeResults(opts.out, results, { noWait: opts.noWait })
   return results
@@ -200,22 +214,130 @@ async function profilesMenu() {
   }
 }
 
+// ---------------------------------------------------------------- WoWUtils
+
+/** Pide key + grupo si no estan guardados, y comprueba que funcionan. */
+async function wowutilsWizard() {
+  log('\n--- WoWUtils ---')
+  log('Hace falta la API key del grupo (Group settings → API sharing) y el id del')
+  log('grupo, que sale en la URL: wowutils.com/viserio-cooldowns/groups/<ID>')
+  log('Se guardan en este PC. Enter en blanco para cancelar.\n')
+
+  const apiKey = await promptHidden('API KEY: ')
+  if (!apiKey) return null
+  const groupId = await prompt('GROUP ID: ')
+  if (!groupId) return null
+
+  log('\nComprobando...')
+  const check = await checkWowutils({ apiKey, groupId })
+  if (!check.ok) {
+    log(`No vale: ${check.message}`)
+    return null
+  }
+  saveWowutils({ apiKey, groupId })
+  log(`Conectado al grupo "${check.name}" (quedan ${check.remaining ?? '?'} pts). Guardado.`)
+  return { apiKey, groupId }
+}
+
+/** Sube a WoWUtils los droptimizers terminados que se le pasen. */
+async function uploadToWowutils(items) {
+  if (!items.length) {
+    log('\nNo hay droptimizers terminados que subir.')
+    return
+  }
+  let creds = readWowutils()
+  if (!creds) {
+    log('\nWoWUtils no esta configurado todavia.')
+    creds = await wowutilsWizard()
+    if (!creds) return
+  }
+  log(`\nSubiendo ${items.length} droptimizer(s) al grupo — ${items.length * 5} pts del presupuesto:`)
+  const { done, failed } = await importDroptimizers(items, { ...creds, dryRun: opts.dryRun })
+  log(`\nSubidos: ${done.length}${failed.length ? ` · fallidos: ${failed.length}` : ''}`)
+  if (failed.length) log('Los fallidos se pueden reintentar con la opcion 5 del menu.')
+}
+
+/** Pregunta si subir lo que se acaba de simular. */
+async function offerUpload(results) {
+  const items = importableFrom(results)
+  if (!items.length || opts.noWait) return
+  const respuesta = (await prompt(`\n¿Subir estos ${items.length} droptimizer(s) a WoWUtils? [S/n]: `)).toLowerCase()
+  if (respuesta === 'n') return
+  await uploadToWowutils(items)
+}
+
+async function wowutilsMenu() {
+  const creds = readWowutils()
+  const file = latestResultsFile(opts.out)
+  log('\n--- WoWUtils ---')
+  log(`Configuracion: ${creds ? `grupo ${creds.groupId} (${creds.from})` : 'sin configurar'}`)
+  log(`Ultimos resultados: ${file ? path.basename(file) : 'ninguno'}`)
+  log('  1) Subir los ultimos droptimizers')
+  log('  2) Configurar / cambiar la API key y el grupo')
+  log('  3) Borrar la configuracion de este PC')
+  log('  0) Volver')
+  const opcion = await prompt('> ')
+
+  if (opcion === '1') {
+    if (!file) { log('\nNo hay resultados todavia: lanza antes una tanda.'); return }
+    await uploadToWowutils(importableFrom(JSON.parse(fs.readFileSync(file, 'utf8'))))
+  } else if (opcion === '2') {
+    await wowutilsWizard()
+  } else if (opcion === '3') {
+    forgetWowutils()
+    log('Configuracion de WoWUtils borrada.')
+  }
+}
+
+// ---------------------------------------------------------------- menu
+
 async function concurrencyMenu() {
   const config = loadConfig()
   log('\n--- Sims a la vez ---')
   log('Raidbots limita cuantos sims puede tener corriendo una cuenta a la vez.')
   log('Si te pasas, las pestañas de sobra esperan su turno solas (no fallan).')
-  log('  1) De uno en uno            (lo mas prudente)')
-  log('  2) 2 a la vez')
-  log('  3) 3 a la vez')
-  log('  4) Todos a la vez (hasta 5) — recomendado con Premium')
+  log('  1) Todos a la vez (hasta 5) — por defecto')
+  log('  2) De uno en uno            (lo mas prudente)')
+  log('  3) 2 a la vez')
+  log('  4) 3 a la vez')
   log('  0) Volver sin cambiar')
   const opcion = await prompt('> ')
-  const valores = { 1: '1', 2: '2', 3: '3', 4: 'auto' }
+  const valores = { 1: 'auto', 2: '1', 3: '2', 4: '3' }
   const elegido = valores[opcion]
   if (!elegido) return
   saveConfig({ ...config, concurrency: elegido })
   log(`Guardado: ${elegido === 'auto' ? 'todos a la vez (hasta 5)' : `${elegido} a la vez`}.`)
+}
+
+async function simcVersionMenu() {
+  const config = loadConfig()
+  log('\n--- Version de SimulationCraft ---')
+  log('  1) Weekly   build semanal estable (lo que usa Raidbots por defecto)')
+  log('  2) Nightly  build del dia: mas al dia, con alguna posibilidad de bugs')
+  log('  3) Latest   ultimo commit')
+  log('  0) Volver sin cambiar')
+  const opcion = await prompt('> ')
+  const valores = { 1: 'weekly', 2: 'nightly', 3: 'latest' }
+  const elegido = valores[opcion]
+  if (!elegido) return
+  saveConfig({ ...config, simcVersion: elegido })
+  log(`Guardado: SimC ${elegido}.`)
+}
+
+async function optionsMenu() {
+  while (true) {
+    const config = loadConfig()
+    log('\n--- Opciones ---')
+    log(`Sims a la vez:    ${(config.concurrency || 'auto') === 'auto' ? 'todos a la vez (hasta 5)' : config.concurrency}`)
+    log(`Version de SimC:  ${config.simcVersion || 'weekly'}`)
+    log('  1) Cambiar cuantos sims a la vez')
+    log('  2) Cambiar la version de SimC')
+    log('  0) Volver')
+    const opcion = await prompt('> ')
+    if (opcion === '1') await concurrencyMenu()
+    else if (opcion === '2') await simcVersionMenu()
+    else return
+  }
 }
 
 async function mainMenu(context, page, session) {
@@ -227,29 +349,32 @@ async function mainMenu(context, page, session) {
     const workers = resolveWorkers(profiles.length)
     log(`Cuenta:   ${session.text}`)
     log(`Perfiles: ${profiles.length} de ${allProfiles.length} (${profiles.map((p) => p.key).join(', ')})`)
-    log(`En paralelo: ${workers === 1 ? 'de uno en uno' : `${workers} a la vez`}`)
+    log(`En paralelo: ${workers === 1 ? 'de uno en uno' : `${workers} a la vez`} · SimC ${resolveSimcVersion()}`)
     log('')
     log('  1) Pegar mi SimC y lanzar   (lo coge del portapapeles)')
     log('  2) Lanzar los SimC guardados en la carpeta simc/')
     log('  3) Elegir que perfiles lanzar')
-    log('  4) Cuantos sims a la vez')
-    log('  5) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)')
+    log('  4) Opciones (sims en paralelo, version de SimC)')
+    log('  5) Subir a WoWUtils')
+    log('  6) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)')
     log('  0) Salir')
     const opcion = await prompt('> ')
 
     if (opcion === '1') {
       const entry = await simcFromClipboard()
-      if (entry) await launch(context, page, [entry], profiles)
+      if (entry) await offerUpload(await launch(context, page, [entry], profiles))
     } else if (opcion === '2') {
       const files = simcFilesFromDisk()
       if (!files.length) { log('\nNo hay ficheros .simc en la carpeta simc/.'); continue }
       log(`\n${files.length} fichero(s): ${files.map((f) => path.basename(f)).join(', ')}`)
-      await launch(context, page, readCharacters(files), profiles)
+      await offerUpload(await launch(context, page, readCharacters(files), profiles))
     } else if (opcion === '3') {
       await profilesMenu()
     } else if (opcion === '4') {
-      await concurrencyMenu()
+      await optionsMenu()
     } else if (opcion === '5') {
+      await wowutilsMenu()
+    } else if (opcion === '6') {
       session = await accountMenu(context, session)
     } else if (opcion === '0' || opcion === '') {
       return
@@ -299,6 +424,14 @@ async function main() {
       return 1
     }
     const results = await launch(context, page, readCharacters(files), selectedProfiles())
+    if (opts.import) {
+      const creds = readWowutils()
+      if (!creds) {
+        log('\n--import: falta la configuracion de WoWUtils (variables de entorno o wowutils-account.json).')
+      } else {
+        await uploadToWowutils(importableFrom(results))
+      }
+    }
     const failed = results.filter((r) => r.state !== 'complete' && r.state !== 'dry-run' && !(opts.noWait && r.url))
     return failed.length ? 1 : 0
   } finally {

@@ -34,21 +34,45 @@ Perfiles: 5 de 5 (raid-normal, raid-heroic, raid-mythic, mplus-10, mplus-vault-1
   1) Pegar mi SimC y lanzar   (lo coge del portapapeles)
   2) Lanzar los SimC guardados en la carpeta simc/
   3) Elegir que perfiles lanzar
-  4) Cuantos sims a la vez
-  5) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)
+  4) Opciones (sims en paralelo, version de SimC)
+  5) Subir a WoWUtils
+  6) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)
   0) Salir
 ```
 
-### Lanzar los perfiles en paralelo
+### Sims en paralelo (por defecto)
 
-Opción **4** del menú (o `--concurrency`): cada sim va en su propia pestaña, así que los 5
-perfiles pueden salir a la vez en lugar de uno detrás de otro.
+Cada sim va en su propia pestaña y **de fábrica salen todos a la vez**, con tope 5. Si solo
+tienes 2 perfiles seleccionados, van esos 2 en paralelo. Así la tanda dura lo que dure el sim
+más largo en vez de la suma de todos.
 
 El tope real lo pone Raidbots, no esta herramienta: una cuenta solo puede tener un número
-limitado de sims corriendo a la vez (1 sin Premium) y contesta
-*"You are running too many sims at once"*. Cuando eso pasa **no se pierde el sim**: esa pestaña
-se queda esperando hueco y lo reintenta cada 30 s hasta 15 minutos. O sea que poner "todos a la
-vez" nunca rompe nada; simplemente irán entrando al ritmo que permita la cuenta.
+limitado de sims corriendo a la vez y contesta *"You are running too many sims at once"*.
+Cuando eso pasa **no se pierde el sim**: esa pestaña espera hueco y lo reintenta cada 30 s
+hasta 15 minutos. Se puede bajar en la opción 4 o con `--concurrency 1`.
+
+### Versión de SimulationCraft
+
+Raidbots ofrece `weekly` (build semanal estable, su defecto), `nightly` (build del día) y
+`latest` (último commit). La herramienta la fija **siempre de forma explícita** para que no
+dependa de lo que quedara elegido la vez anterior; por defecto usa `weekly`. Se cambia en la
+opción 4 del menú o con `--simc-version nightly`.
+
+### Subir a WoWUtils desde el propio programa
+
+Al terminar una tanda pregunta si quieres subir las URLs al grupo, y la opción **5** del menú
+sube la última tanda cuando quieras. La primera vez pide la API key del grupo
+(*Group settings → API sharing*) y el id del grupo, que sale en la URL de wowutils.com; se
+guardan en `wowutils-account.json` y no vuelve a preguntar.
+
+Cada import cuesta 5 puntos del presupuesto por hora del grupo; si se agota, espera al reset en
+vez de encadenar errores. Los `profileKey` que manda (`normal-max`, `heroic-max`, `mythic-max`,
+`mplus-drops`, `mplus-vault`) los normaliza WoWUtils, y si alguno no le gustara se reintenta sin
+él para que lo deduzca del propio report.
+
+> ⚠️ La API key da acceso de **lectura y escritura a todo el grupo**. Si repartes el ZIP con
+> `wowutils-account.json` dentro, todo el mundo puede escribir en el grupo. Para una guild suele
+> ser mejor que solo la configuren los oficiales, y que el resto pase las URLs.
 
 ## Desde el código
 
@@ -69,7 +93,9 @@ npm run build                                    # genera dist/Droptimizer.exe
 | `--headed` | Muestra el navegador en vez de ir en silencio |
 | `--dry-run` | Configura todo pero **no** lanza los sims |
 | `--no-wait` | Envía los sims y devuelve las URLs sin esperar a que terminen |
-| `--concurrency <n\|auto>` | Sims simultáneos. `auto` = todos a la vez (hasta 5) |
+| `--concurrency <n\|auto>` | Sims simultáneos. `auto` (defecto) = todos a la vez, hasta 5 |
+| `--simc-version <v>` | `weekly` (defecto), `nightly` o `latest` |
+| `--import` | Al terminar, sube las URLs a WoWUtils |
 | `--timeout-min <n>` | Minutos máximos de espera por sim (por defecto 25) |
 
 ## Perfiles
@@ -105,19 +131,20 @@ Un perfil es literalmente los textos que pulsarías en la web:
 
 ## Importar en WoWUtils (opcional)
 
+Lo normal es hacerlo desde el menú (opción 5) o con `--import`. Para automatizar también está
+el CLI:
+
 ```powershell
 node import.mjs --dry-run     # ver qué se enviaría
-node import.mjs               # importa el último out/droptimizers-*.json
+node import.mjs               # sube el último out/droptimizers-*.json
 ```
 
-Necesita un `.env` al lado con la key y el grupo:
+Las credenciales salen del `wowutils-account.json` que deja el menú, o de un `.env` al lado:
 
 ```
 WOWUTILS_API_KEY=wowutils_live_...
 WOWUTILS_GROUP_ID=...
 ```
-
-Cada import cuesta 5 puntos del presupuesto del grupo.
 
 ## Cómo funciona
 
