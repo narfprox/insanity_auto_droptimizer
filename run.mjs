@@ -455,8 +455,28 @@ async function main() {
 
   // Interfaz grafica: ventana propia con botones.
   if (opts.ui) {
-    const { arrancarUI } = await import('./ui.mjs')
-    log('Abriendo la ventana... (puedes minimizar esta consola)')
+    const { arrancarUI, encontrarNavegador } = await import('./ui.mjs')
+
+    /*
+     * Empaquetado, el .exe es una aplicacion de consola: al abrirlo con doble
+     * clic sale una ventana negra que no pinta nada cuando se usa la interfaz.
+     * Se relanza el programa en segundo plano y sin consola, y este proceso se
+     * va, con lo que la ventana negra desaparece. Solo si hay navegador: sin el
+     * no habria ventana y el usuario se quedaria sin nada que mirar.
+     */
+    if (IS_PACKAGED && !has('ui-hijo') && encontrarNavegador()) {
+      const { spawn } = await import('node:child_process')
+      // Sin consola no hay donde leer los errores: se guardan en out/ui.log.
+      const registro = fs.openSync(path.join(opts.out, 'ui.log'), 'a')
+      spawn(process.execPath, ['--ui', '--ui-hijo'], {
+        detached: true,
+        stdio: ['ignore', registro, registro],
+        windowsHide: true,
+      }).unref()
+      return 0
+    }
+
+    log('Abriendo la ventana...')
     const { abierta, direccion } = await arrancarUI({})
     if (abierta) return 0
     // Sin navegador no hay ventana posible: se cae al menu de consola.
@@ -522,7 +542,15 @@ main()
   })
   .then(async (code) => {
     await closeBrowser()
-    // En el menu el usuario ya ha elegido salir; solo se pausa si algo fallo.
-    if (opts.pause && (!opts.menu || code !== 0)) await prompt('\nPulsa Enter para cerrar... ')
+    /*
+     * Tras el menu o la ventana el usuario ya ha decidido salir; solo se pausa
+     * si algo fallo o si venia de una ejecucion directa con flags. En el proceso
+     * de fondo de la interfaz no se pausa NUNCA: no tiene consola donde pulsar
+     * Enter y se quedaria vivo para siempre sin que nadie lo viera.
+     */
+    const enSegundoPlano = has('ui-hijo')
+    if (opts.pause && !enSegundoPlano && ((!opts.menu && !opts.ui) || code !== 0)) {
+      await prompt('\nPulsa Enter para cerrar... ')
+    }
     process.exit(code)
   })

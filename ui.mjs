@@ -252,8 +252,8 @@ export async function arrancarUI({ puerto = 0, abrir = true } = {}) {
   return { direccion, servidor, abierta: true }
 }
 
-/** Abre la ventana de aplicacion con el navegador instalado (sin pestañas ni barra). */
-function abrirVentana(direccion) {
+/** Ruta del navegador con el que abrir la ventana, o null si no hay ninguno. */
+export function encontrarNavegador() {
   const candidatos = [
     `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe`,
     `${process.env.PROGRAMFILES}\\Google\\Chrome\\Application\\chrome.exe`,
@@ -261,7 +261,12 @@ function abrirVentana(direccion) {
     `${process.env['PROGRAMFILES(X86)']}\\Microsoft\\Edge\\Application\\msedge.exe`,
     `${process.env.PROGRAMFILES}\\Microsoft\\Edge\\Application\\msedge.exe`,
   ]
-  const exe = candidatos.find((f) => f && fs.existsSync(f))
+  return candidatos.find((f) => f && fs.existsSync(f)) || null
+}
+
+/** Abre la ventana de aplicacion: sin pestañas, sin barra de direcciones. */
+function abrirVentana(direccion) {
+  const exe = encontrarNavegador()
   if (!exe) return null
 
   return spawn(exe, [
@@ -270,5 +275,8 @@ function abrirVentana(direccion) {
     '--window-size=1180,860',
     '--no-first-run',
     '--no-default-browser-check',
+    // La pagina esta en español: sin esto Chrome ofrece traducirla cada vez.
+    '--disable-features=Translate,TranslateUI',
+    '--disable-translate',
   ], { detached: false, stdio: 'ignore' })
 }

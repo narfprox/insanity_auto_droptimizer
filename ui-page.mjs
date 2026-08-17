@@ -1,8 +1,9 @@
 /** La ventana de la aplicacion: una sola pagina, sin dependencias externas. */
 export const PAGINA = /* html */ `<!doctype html>
-<html lang="es">
+<html lang="es" translate="no">
 <head>
 <meta charset="utf-8">
+<meta name="google" content="notranslate">
 <title>Droptimizer · Insanity</title>
 <link rel="icon" href="/icono.png">
 <style>
@@ -76,7 +77,7 @@ export const PAGINA = /* html */ `<!doctype html>
   .ancho { grid-column: 1 / -1; }
 </style>
 </head>
-<body>
+<body class="notranslate">
 <header>
   <h1>Droptimizer · Insanity</h1>
   <div class="cuenta" id="cuenta">comprobando cuenta…</div>
