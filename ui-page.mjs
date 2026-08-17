@@ -67,6 +67,7 @@ export const PAGINA = /* html */ `<!doctype html>
   .res { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #2a2735; }
   .res:last-child { border-bottom: 0; }
   .res .et { flex: 1; }
+  .res .et b { color: var(--morado); font-weight: 600; }
   .res a { color: var(--morado); text-decoration: none; font: 12px Consolas, monospace; }
   .res a:hover { text-decoration: underline; }
   button.mini { padding: 3px 10px; font-size: 12px; border-radius: 6px; }
@@ -194,7 +195,7 @@ function pintarResultados(resultados) {
     fila.className = 'res'
     const estado = r.state === 'complete' ? 'ok' : r.state === 'error' ? 'mal' : ''
     fila.innerHTML = '<span class="pin ' + estado + '">' + (r.state || '—') + '</span>'
-      + '<span class="et">' + r.label + '</span>'
+      + '<span class="et">' + (r.character ? '<b>' + r.character + '</b> · ' + (r.spec || '') + ' — ' : '') + r.label + '</span>'
       + (r.url
         ? '<a href="' + r.url + '" target="_blank">abrir report</a>'
           + '<button class="sec mini" data-url="' + r.url + '">copiar</button>'
