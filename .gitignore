@@ -1,0 +1,9 @@
+node_modules/
+.build/
+dist/
+out/
+.browser-profile/
+config.json
+raidbots-account.json
+.env
+simc/*.simc

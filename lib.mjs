@@ -1,0 +1,506 @@
+/**
+ * Nucleo compartido: navegador, sesion de Raidbots, configuracion de la web y
+ * lanzamiento de los sims. run.mjs (CLI + menu) es quien lo usa.
+ */
+import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
+import readline from 'node:readline'
+import { Writable } from 'node:stream'
+import { fileURLToPath } from 'node:url'
+import { chromium } from 'playwright-core'
+import DEFAULT_PROFILES from './profiles.json' with { type: 'json' }
+
+export const BASE = 'https://www.raidbots.com'
+export const DROPTIMIZER_URL = `${BASE}/simbot/droptimizer`
+
+export const IS_PACKAGED = (() => {
+  try {
+    // eslint-disable-next-line no-undef
+    return !!(process.versions.sea || require('node:sea').isSea())
+  } catch { return false }
+})()
+
+/** Carpeta de trabajo: junto al .exe si esta empaquetado, si no junto al script. */
+export const HERE = process.env.DROPTIMIZER_HOME
+  ? path.resolve(process.env.DROPTIMIZER_HOME)
+  : IS_PACKAGED ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url))
+
+export const PROFILE_DIR = path.join(HERE, '.browser-profile')
+export const SIMC_DIR = path.join(HERE, 'simc')
+export const ACCOUNT_FILE = path.join(HERE, 'raidbots-account.json')
+export const CONFIG_FILE = path.join(HERE, 'config.json')
+
+const CLASSES = [
+  'death_knight', 'demon_hunter', 'druid', 'evoker', 'hunter', 'mage', 'monk',
+  'paladin', 'priest', 'rogue', 'shaman', 'warlock', 'warrior',
+]
+
+// ---------------------------------------------------------------- utils
+
+export const log = (...m) => console.log(...m)
+export const stamp = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/*
+ * Una sola interfaz de readline para todo el programa: si se creara una por
+ * pregunta, al cerrarla se perderia lo que ya hubiera leido de stdin.
+ * La salida va por un stream propio que se puede silenciar (contraseñas).
+ */
+let rl = null
+let output = null
+
+function getReadline() {
+  if (!rl) {
+    output = new Writable({
+      write(chunk, encoding, callback) {
+        if (!output.silent) process.stdout.write(chunk, encoding)
+        callback()
+      },
+    })
+    rl = readline.createInterface({ input: process.stdin, output, terminal: true })
+    rl.on('close', () => { rl = null })
+  }
+  return rl
+}
+
+export function prompt(question) {
+  return new Promise((resolve) => getReadline().question(question, (v) => resolve(v.trim())))
+}
+
+/** Igual que prompt pero sin mostrar lo que se teclea (contraseñas). */
+export function promptHidden(question) {
+  return new Promise((resolve) => {
+    getReadline().question(question, (value) => {
+      output.silent = false
+      process.stdout.write('\n')
+      resolve(value.trim())
+    })
+    output.silent = true // la pregunta ya esta escrita; lo que se teclee, no
+  })
+}
+
+export function closePrompts() {
+  rl?.close()
+  rl = null
+}
+
+/** Datos basicos del personaje a partir del string SimC. */
+export function parseSimc(text) {
+  const line = (re) => (text.match(re) || [])[1] || null
+  let name = null
+  let klass = null
+  for (const c of CLASSES) {
+    const m = text.match(new RegExp(`^${c}="?([^"\\n]+)"?`, 'm'))
+    if (m) { klass = c; name = m[1].trim(); break }
+  }
+  return {
+    name,
+    class: klass,
+    spec: line(/^spec=(\w+)/m),
+    realm: line(/^server=(\S+)/m),
+    region: line(/^region=(\S+)/m),
+  }
+}
+
+export function simcFileName(character) {
+  const base = [character.name, character.spec].filter(Boolean).join('-').toLowerCase()
+    .replace(/[^a-z0-9-]/g, '') || 'personaje'
+  return `${base}.simc`
+}
+
+/** Lee el portapapeles del sistema (donde deja el texto el addon SimC). */
+export function readClipboard() {
+  try {
+    if (process.platform === 'win32') {
+      return execFileSync('powershell', ['-NoProfile', '-Command', 'Get-Clipboard -Raw'], {
+        encoding: 'utf8', maxBuffer: 10 * 1024 * 1024,
+      })
+    }
+    if (process.platform === 'darwin') return execFileSync('pbpaste', { encoding: 'utf8' })
+    return execFileSync('xclip', ['-selection', 'clipboard', '-o'], { encoding: 'utf8' })
+  } catch {
+    return null
+  }
+}
+
+/** Un texto solo vale si trae clase + spec (o sea, si es un export del addon). */
+export function looksLikeSimc(text) {
+  if (!text || text.length < 200) return false
+  const c = parseSimc(text)
+  return !!(c.name && c.class)
+}
+
+// ---------------------------------------------------------------- config
+
+export function loadConfig() {
+  try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) } catch { return {} }
+}
+
+export function saveConfig(config) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+}
+
+/** Perfiles de droptimizer: manda un profiles.json al lado del programa si existe. */
+export function loadProfiles() {
+  const file = path.join(HERE, 'profiles.json')
+  if (fs.existsSync(file)) {
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { log('aviso: profiles.json no es valido, se usan los de fabrica') }
+  }
+  return DEFAULT_PROFILES
+}
+
+// ---------------------------------------------------------------- cuenta
+
+/** Credenciales guardadas: variables de entorno o raidbots-account.json. */
+export function readAccount() {
+  if (process.env.RAIDBOTS_EMAIL && process.env.RAIDBOTS_PASSWORD) {
+    return { email: process.env.RAIDBOTS_EMAIL, password: process.env.RAIDBOTS_PASSWORD, from: 'variables de entorno' }
+  }
+  if (fs.existsSync(ACCOUNT_FILE)) {
+    try {
+      const { email, password } = JSON.parse(fs.readFileSync(ACCOUNT_FILE, 'utf8'))
+      if (email && password) return { email, password, from: 'credenciales guardadas' }
+    } catch { log('aviso: raidbots-account.json no es un JSON valido') }
+  }
+  return null
+}
+
+export function saveAccount({ email, password }) {
+  fs.writeFileSync(ACCOUNT_FILE, JSON.stringify({ email, password }, null, 2))
+}
+
+export function forgetAccount() {
+  fs.rmSync(ACCOUNT_FILE, { force: true })
+}
+
+// ---------------------------------------------------------------- navegador
+
+/** Usa el Edge/Chrome ya instalado: no hace falta descargar Chromium. */
+export async function launchContext({ headless = true } = {}) {
+  const channels = process.env.RB_BROWSER_CHANNEL
+    ? [process.env.RB_BROWSER_CHANNEL]
+    : ['msedge', 'chrome', 'chromium']
+  const common = {
+    headless,
+    viewport: { width: 1500, height: 1000 },
+    args: ['--disable-blink-features=AutomationControlled'],
+  }
+  let lastErr
+  for (const channel of channels) {
+    try {
+      return await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
+    } catch (e) { lastErr = e }
+  }
+  if (process.env.RB_EXECUTABLE_PATH) {
+    return chromium.launchPersistentContext(PROFILE_DIR, { ...common, executablePath: process.env.RB_EXECUTABLE_PATH })
+  }
+  throw new Error(`No se pudo abrir ningun navegador (${channels.join(', ')}). Instala Edge o Chrome, o define RB_EXECUTABLE_PATH. Causa: ${lastErr?.message}`)
+}
+
+/** Quien esta logueado en el perfil de navegador guardado (y con que limites). */
+export async function describeSession(context) {
+  try {
+    const res = await context.request.get(`${BASE}/api/me`, { timeout: 20000 })
+    if (!res.ok()) return { anonymous: true, text: 'anonima (sin login) — cola gratuita' }
+    const user = (await res.json())?.user
+    if (!user || (!user.username && !user.email)) return { anonymous: true, text: 'anonima (sin login) — cola gratuita' }
+    const who = user.username || user.email
+    const tier = user.patreonTitle ? `premium: ${user.patreonTitle}` : 'sin premium'
+    const limit = user.concurrentSimLimit || 1
+    return { anonymous: false, user: who, concurrentSimLimit: limit, text: `${who} — ${tier} — ${limit} sim(s) a la vez` }
+  } catch {
+    return { anonymous: true, text: 'no se pudo comprobar (¿sin internet?)' }
+  }
+}
+
+/** Login por API. La cookie queda en el perfil, asi que solo hace falta una vez. */
+export async function login(context, { email, password }) {
+  const res = await context.request.post(`${BASE}/api/login`, {
+    data: { email, password },
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 30000,
+  })
+  if (res.ok()) return { ok: true, session: await describeSession(context) }
+  const message = res.status() === 401
+    ? 'email o contraseña incorrectos'
+    : `Raidbots devolvio HTTP ${res.status()}`
+  return { ok: false, message }
+}
+
+/** Cierra sesion en este PC: borra cookies del perfil y credenciales guardadas. */
+export async function logout(context) {
+  await context.clearCookies()
+  forgetAccount()
+}
+
+/** Si la sesion guardada no vale, entra con las credenciales que haya. */
+export async function ensureLogin(context, session) {
+  if (!session.anonymous) return session
+  const account = readAccount()
+  if (!account) return session
+  log(`  entrando con las credenciales guardadas (${account.from})...`)
+  const result = await login(context, account)
+  if (!result.ok) {
+    log(`  no se pudo entrar: ${result.message} — se sigue en anonimo`)
+    return session
+  }
+  log(`  Cuenta de Raidbots: ${result.session.text}`)
+  return result.session
+}
+
+// ---------------------------------------------------------------- web de Raidbots
+
+/**
+ * Click sobre un elemento de la UI identificado por su texto exacto.
+ * La cabecera es sticky y tapa parte de la pagina: si intercepta el click,
+ * se dispara el evento directamente sobre el elemento.
+ */
+async function clickOption(page, text) {
+  const target = page.getByText(text, { exact: true }).first()
+  await target.waitFor({ state: 'visible', timeout: 30000 })
+  await target.scrollIntoViewIfNeeded()
+  await page.evaluate(() => window.scrollBy(0, -200))
+  await page.waitForTimeout(300)
+  try {
+    await target.click({ timeout: 8000 })
+  } catch {
+    await target.evaluate((el) => el.click())
+  }
+  await page.waitForTimeout(1200)
+}
+
+async function setCheckbox(page, name, wanted) {
+  const input = page.locator(`input[type=checkbox][name="${name}"]`).first()
+  await input.waitFor({ state: 'attached', timeout: 30000 })
+  const current = await input.evaluate((el) => el.checked)
+  if (current !== wanted) {
+    await page.locator(`label:has(input[type=checkbox][name="${name}"])`).first().click()
+    await page.waitForTimeout(400)
+  }
+  const after = await input.evaluate((el) => el.checked)
+  if (after !== wanted) throw new Error(`No se pudo poner la casilla "${name}" a ${wanted}`)
+}
+
+/** Carga el personaje pegando el SimC en el editor (CodeMirror). */
+export async function loadCharacter(page, simc) {
+  await page.goto(DROPTIMIZER_URL, { waitUntil: 'domcontentloaded', timeout: 90000 })
+  const editor = page.locator('[data-testid="simc-editor"] .cm-content')
+  if (!(await editor.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: 'SIMC ADDON' }).click()
+  }
+  await editor.waitFor({ state: 'visible', timeout: 30000 })
+  // focus() en vez de click(): el editor puede quedar tapado por la cabecera sticky.
+  await editor.evaluate((el) => el.focus())
+  const focused = await page.evaluate(() => !!document.activeElement?.closest('.cm-content'))
+  if (!focused) throw new Error('No se pudo enfocar el editor SimC')
+  await page.keyboard.press('ControlOrMeta+a')
+  await page.keyboard.insertText(simc)
+  // Con el personaje cargado aparece la seccion de fuentes de loot.
+  // Ojo: el DOM pone "Sources"; las mayusculas son solo CSS.
+  await page.getByText(/^sources$/i).first().waitFor({ state: 'visible', timeout: 60000 })
+  await page.waitForTimeout(1500)
+}
+
+/** Aplica fuente + dificultad/nivel + "Upgrade up to" + casillas. */
+export async function applyProfile(page, profile) {
+  await clickOption(page, profile.source)
+  for (const step of profile.select || []) await clickOption(page, step)
+
+  // El desplegable "Upgrade up to" es un react-select con un input oculto upgradeLevel.
+  const container = page.locator('div:has(> input[type=hidden][name="upgradeLevel"])').last()
+  await container.waitFor({ state: 'visible', timeout: 30000 })
+  await container.scrollIntoViewIfNeeded()
+  await page.evaluate(() => window.scrollBy(0, -200))
+  const options = page.locator('[id*="-option-"]')
+  try {
+    await container.locator('[class*="-control"]').first().click({ timeout: 10000 })
+    await options.first().waitFor({ state: 'visible', timeout: 5000 })
+  } catch {
+    // react-select tambien abre el menu con la flecha abajo sobre su input.
+    await container.locator('[role="combobox"]').first().evaluate((el) => el.focus())
+    await page.keyboard.press('ArrowDown')
+    await options.first().waitFor({ state: 'visible', timeout: 10000 })
+  }
+  await page.waitForTimeout(500)
+  const labels = await options.allInnerTexts()
+  if (labels.length < 2) throw new Error('El desplegable "Upgrade up to" no ofrecio ninguna opcion de upgrade')
+
+  let index
+  if (profile.upgrade === 'max' || profile.upgrade == null) {
+    index = 1 // 0 = "Base level, no upgrades"; 1 = el 6/6 del track activo
+  } else {
+    const wanted = String(profile.upgrade).replace(/\s+/g, ' ').trim()
+    index = labels.findIndex((l) => l.replace(/\s+/g, ' ').trim().startsWith(wanted))
+    if (index === -1) {
+      throw new Error(`"${wanted}" no esta entre las opciones (${labels.map((l) => l.replace(/\s+/g, ' ')).join(' / ')})`)
+    }
+  }
+  const chosen = labels[index].replace(/\s+/g, ' ').trim()
+  await options.nth(index).click()
+  await page.waitForTimeout(600)
+
+  const level = await page.locator('input[type=hidden][name="upgradeLevel"]').first().inputValue()
+  if (level === '0') throw new Error('El nivel de upgrade se quedo en "Base level, no upgrades"')
+
+  await setCheckbox(page, 'upgradeEquipped', profile.upgradeEquipped !== false)
+  await setCheckbox(page, 'smartHighPrecision', profile.highPrecision !== false)
+  return { upgradeLabel: chosen, upgradeLevel: level }
+}
+
+/** Pulsa RUN DROPTIMIZER y captura el simId de la respuesta de /sim. */
+async function submit(page) {
+  const responsePromise = page.waitForResponse(
+    (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/sim',
+    { timeout: 120000 },
+  )
+  await page.getByRole('button', { name: 'RUN DROPTIMIZER' }).click()
+  const response = await responsePromise
+  const raw = await response.text()
+  if (!response.ok()) throw new Error(`Raidbots rechazo el sim (HTTP ${response.status()}): ${raw.slice(0, 200)}`)
+  let data
+  try { data = JSON.parse(raw) } catch { throw new Error(`Respuesta inesperada de /sim: ${raw.slice(0, 200)}`) }
+  const simId = data.simId || data.id
+  if (!simId) throw new Error(`La respuesta de /sim no trae simId: ${raw.slice(0, 200)}`)
+  return { simId, url: `${BASE}/simbot/report/${simId}` }
+}
+
+/**
+ * Con la cuenta compartida de la guild puede haber varios lanzando a la vez y
+ * Raidbots rechaza por limite de sims simultaneos: se reintenta con espera.
+ */
+export async function submitWithRetry(page, { tag, attempts = 3, waitMs = 60_000 }) {
+  let lastError
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await submit(page)
+    } catch (e) {
+      lastError = e
+      if (i === attempts) break
+      log(`${tag} rechazado (${e.message.slice(0, 120)}) — reintento ${i + 1}/${attempts} en ${waitMs / 1000}s`)
+      await sleep(waitMs)
+    }
+  }
+  throw lastError
+}
+
+/** Espera a que el job termine consultando /api/job/<simId>. */
+export async function waitForJob(context, simId, { timeoutMin, tag }) {
+  const deadline = Date.now() + timeoutMin * 60_000
+  let last = null
+  while (Date.now() < deadline) {
+    const res = await context.request.get(`${BASE}/api/job/${encodeURIComponent(simId)}`, { timeout: 30000 })
+    if (res.ok()) {
+      const body = await res.json()
+      const state = body?.job?.state || null
+      const retries = body?.retriesRemaining ?? 0
+      if (state !== last) { log(`${tag} · ${state}`); last = state }
+      if (state === 'complete') return 'complete'
+      if ((state === 'failed' || state === 'cancelled') && retries <= 0) return state
+    }
+    await sleep(5000)
+  }
+  return 'timeout'
+}
+
+// ---------------------------------------------------------------- ejecucion
+
+/** Construye la lista de tareas: un personaje x un perfil = un sim. */
+export function buildTasks(characters, profiles) {
+  const tasks = []
+  for (const { simc, character } of characters) {
+    for (const profile of profiles) {
+      tasks.push({
+        simc,
+        profile,
+        tag: `[${character.name || '?'} · ${profile.key}]`,
+        entry: {
+          character: character.name,
+          class: character.class,
+          spec: character.spec,
+          realm: character.realm,
+          region: character.region,
+          profileKey: profile.profileKey,
+          profile: profile.key,
+          label: profile.label,
+          simId: null,
+          url: null,
+          state: null,
+          upgradeLabel: null,
+          submittedAt: null,
+          finishedAt: null,
+          error: null,
+        },
+      })
+    }
+  }
+  return tasks
+}
+
+/** Lanza las tareas con N pestañas en paralelo. Devuelve las entradas de resultado. */
+export async function runTasks(context, firstPage, tasks, { workers = 1, dryRun = false, noWait = false, timeoutMin = 25 } = {}) {
+  const results = tasks.map((t) => t.entry)
+  let next = 0
+
+  const worker = async (id) => {
+    const page = id === 0 ? firstPage : await context.newPage()
+    while (true) {
+      const i = next++
+      if (i >= tasks.length) break
+      const { simc, tag, entry, profile } = tasks[i]
+      log(`${tag} ${profile.label}`)
+      try {
+        await loadCharacter(page, simc)
+        const applied = await applyProfile(page, profile)
+        entry.upgradeLabel = applied.upgradeLabel
+        log(`${tag} config: ${profile.source} / ${(profile.select || []).join(' / ')} / upgrade ${applied.upgradeLabel}`)
+
+        if (dryRun) { entry.state = 'dry-run'; continue }
+
+        const { simId, url } = await submitWithRetry(page, { tag })
+        entry.simId = simId
+        entry.url = url
+        entry.submittedAt = stamp()
+        entry.state = 'submitted'
+        log(`${tag} ${url}`)
+
+        if (!noWait) {
+          entry.state = await waitForJob(context, simId, { timeoutMin, tag })
+          entry.finishedAt = stamp()
+          if (entry.state !== 'complete') log(`${tag} ¡atencion! estado final: ${entry.state}`)
+        }
+      } catch (e) {
+        entry.state = entry.state || 'error'
+        entry.error = e.message
+        log(`${tag} ERROR: ${e.message}`)
+      }
+    }
+    if (id !== 0) await page.close()
+  }
+
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(workers, tasks.length)) }, (_, i) => worker(i)))
+  return results
+}
+
+/** Escribe out/<fecha>.json + out/urls.txt e imprime el resumen. */
+export function writeResults(outDir, results, { noWait = false } = {}) {
+  fs.mkdirSync(outDir, { recursive: true })
+  const outJson = path.join(outDir, `droptimizers-${stamp().replace(/:/g, '')}.json`)
+  fs.writeFileSync(outJson, JSON.stringify(results, null, 2))
+
+  const ok = results.filter((r) => r.url && (r.state === 'complete' || noWait))
+  const urlsTxt = path.join(outDir, 'urls.txt')
+  fs.writeFileSync(urlsTxt, ok.map((r) => r.url).join('\n') + (ok.length ? '\n' : ''))
+
+  log('\n================ RESULTADO ================')
+  for (const r of results) {
+    const mark = r.state === 'complete' ? 'OK ' : r.state === 'submitted' || r.state === 'dry-run' ? '...' : '!! '
+    log(`${mark} ${r.character || '?'} · ${r.label}`)
+    log(`    ${r.url || r.error || r.state}`)
+  }
+  log('\n--- URLs listas para copiar ---')
+  for (const r of ok) log(r.url)
+  log(`\nJSON: ${outJson}`)
+  log(`URLs: ${urlsTxt}`)
+  return { outJson, urlsTxt, ok }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "insanity-droptimizer",
+  "version": "1.0.0",
+  "description": "Lanza los droptimizers de Raidbots desde un string SimC y los importa en WoWUtils",
+  "type": "module",
+  "scripts": {
+    "start": "node run.mjs",
+    "login": "node run.mjs --login",
+    "import": "node import.mjs"
+  },
+  "dependencies": {
+    "playwright-core": "^1.62.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "png-to-ico": "^3.0.2",
+    "postject": "^1.0.0-alpha.6",
+    "rcedit": "^5.0.2"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/narfprox/insanity-droptimizer.git"
+  }
+}

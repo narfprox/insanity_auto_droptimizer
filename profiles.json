@@ -1,0 +1,52 @@
+[
+  {
+    "key": "raid-normal",
+    "label": "Raid Normal — Champion 6/6",
+    "profileKey": "normal-max",
+    "source": "Season 2 Raids",
+    "select": ["Normal"],
+    "upgrade": "max",
+    "upgradeEquipped": true,
+    "highPrecision": true
+  },
+  {
+    "key": "raid-heroic",
+    "label": "Raid Heroic — Hero 6/6",
+    "profileKey": "heroic-max",
+    "source": "Season 2 Raids",
+    "select": ["Heroic"],
+    "upgrade": "max",
+    "upgradeEquipped": true,
+    "highPrecision": true
+  },
+  {
+    "key": "raid-mythic",
+    "label": "Raid Mythic — Myth 6/6",
+    "profileKey": "mythic-max",
+    "source": "Season 2 Raids",
+    "select": ["Mythic"],
+    "upgrade": "max",
+    "upgradeEquipped": true,
+    "highPrecision": true
+  },
+  {
+    "key": "mplus-10",
+    "label": "Mythic+ 10 — Hero 6/6",
+    "profileKey": "mplus",
+    "source": "Mythic+ Dungeons",
+    "select": ["Mythic 10"],
+    "upgrade": "max",
+    "upgradeEquipped": true,
+    "highPrecision": true
+  },
+  {
+    "key": "mplus-vault-10",
+    "label": "Mythic+ Vault +10 — Myth 6/6",
+    "profileKey": "mplus-vault",
+    "source": "Mythic+ Dungeons",
+    "select": ["+10 Vault"],
+    "upgrade": "max",
+    "upgradeEquipped": true,
+    "highPrecision": true
+  }
+]

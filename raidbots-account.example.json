@@ -1,0 +1,5 @@
+{
+  "_comentario": "Copia este fichero a raidbots-account.json y pon la cuenta compartida de la guild. El programa entra solo con ella; si no existe el fichero, va en anonimo.",
+  "email": "cuenta-de-la-guild@ejemplo.com",
+  "password": "la-contraseña"
+}
