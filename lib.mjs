@@ -293,28 +293,16 @@ export function latestResultsFile(outDir) {
 
 // ---------------------------------------------------------------- navegador
 
-/**
- * Mata los navegadores que quedaron vivos de una ejecucion anterior (los que
- * usan NUESTRA carpeta de perfil, nunca el Edge normal del usuario).
- * Devuelve cuantos ha matado.
+/*
+ * Aqui hubo una limpieza automatica de navegadores colgados que enumeraba
+ * procesos y los mataba con PowerShell. Se ha quitado a proposito: un programa
+ * sin firmar que lanza PowerShell para matar procesos dispara la heuristica de
+ * comportamiento de Windows Defender (Trojan:Win32/SuspExec.SE), y no compensa
+ * para un caso que ya no deberia ocurrir: el navegador solo vive mientras dura
+ * la accion y se cierra tambien ante Ctrl+C o el cierre de la ventana.
+ * Si aun asi quedara alguno suelto, se avisa con instrucciones y lo cierra el
+ * usuario. Ver README, apartado "Procesos del navegador".
  */
-export function killStaleBrowsers() {
-  if (process.platform !== 'win32') return 0
-  try {
-    const filtro = ['msedge.exe', 'chrome.exe', 'chromium.exe', 'headless_shell.exe']
-      .map((n) => `Name='${n}'`).join(' or ')
-    const script = `Get-CimInstance Win32_Process -Filter "${filtro}"`
-      + ` | Where-Object { $_.CommandLine -like '*${PROFILE_DIR}*' }`
-      // Al matar el proceso padre mueren tambien sus hijos, asi que los que ya
-      // no existen no cuentan (y su error no debe salir por pantalla).
-      + ' | ForEach-Object { try { Stop-Process -Id $_.ProcessId -Force -ErrorAction Stop; $_.ProcessId } catch {} }'
-    const out = execFileSync('powershell', ['-NoProfile', '-Command', script], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    return out.trim().split(/\s+/).filter(Boolean).length
-  } catch { return 0 }
-}
 
 /** Usa el Edge/Chrome ya instalado: no hace falta descargar Chromium. */
 export async function launchContext({ headless = true } = {}) {
@@ -327,30 +315,19 @@ export async function launchContext({ headless = true } = {}) {
     args: ['--disable-blink-features=AutomationControlled'],
   }
   let lastErr
-  for (const intento of [1, 2]) {
-    for (const channel of channels) {
-      try {
-        return await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
-      } catch (e) { lastErr = e }
-    }
-    // Si la carpeta del perfil esta bloqueada, suele ser un proceso zombi de una
-    // ejecucion anterior: se mata y se reintenta una vez.
-    if (intento === 1 && /ProcessSingleton|profile directory|being used|SingletonLock/i.test(lastErr?.message || '')) {
-      const muertos = killStaleBrowsers()
-      if (muertos) {
-        log(`  (cerrados ${muertos} proceso(s) de navegador que quedaron sueltos)`)
-        continue
-      }
-    }
-    break
+  for (const channel of channels) {
+    try {
+      return await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
+    } catch (e) { lastErr = e }
   }
   if (process.env.RB_EXECUTABLE_PATH) {
     return chromium.launchPersistentContext(PROFILE_DIR, { ...common, executablePath: process.env.RB_EXECUTABLE_PATH })
   }
   // Un proceso anterior que se quedo vivo bloquea la carpeta del perfil.
   if (/ProcessSingleton|profile directory|being used|SingletonLock/i.test(lastErr?.message || '')) {
-    throw new Error('La carpeta .browser-profile esta en uso: seguramente hay otra copia del'
-      + ' programa abierta. Cierrala y vuelve a intentarlo.')
+    throw new Error('La carpeta .browser-profile esta en uso: seguramente hay otra copia del\n'
+      + 'programa abierta. Cierrala y vuelve a intentarlo. Si no la encuentras, borra\n'
+      + 'la carpeta .browser-profile (se vuelve a crear sola; tendras que entrar otra vez).')
   }
   throw new Error(`No se pudo abrir ningun navegador (${channels.join(', ')}). Instala Edge o Chrome, o define RB_EXECUTABLE_PATH. Causa: ${lastErr?.message}`)
 }

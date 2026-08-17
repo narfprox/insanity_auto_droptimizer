@@ -175,17 +175,28 @@ El navegador **solo se abre para la acción concreta** (comprobar la sesión, la
 hacer login) y se cierra en cuanto termina: mientras el menú está en pantalla no hay ningún
 proceso de Edge/Chrome vivo, así que la carpeta no queda bloqueada y puedes borrarla o moverla.
 
-Además se cierra el navegador al recibir Ctrl+C o al cerrar la ventana, y si al arrancar la
-carpeta `.browser-profile` estuviera bloqueada por algo que quedó suelto de una ejecución
-anterior, se cierra **solo lo que use esa carpeta** (nunca tu Edge normal) y se reintenta.
-
-Si alguna vez quieres limpiarlo a mano:
+Además se cierra el navegador al recibir Ctrl+C o al cerrar la ventana. Si aun así alguna vez
+quedara alguno suelto y `.browser-profile` apareciera bloqueada, el programa te lo dice y lo
+cierras tú:
 
 ```powershell
 Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" |
   Where-Object { $_.CommandLine -like '*browser-profile*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
 ```
+
+## Antivirus
+
+El `.exe` **no está firmado** (firmarlo cuesta un certificado de pago), así que Windows
+SmartScreen avisa la primera vez. Eso es esperable.
+
+Aparte de eso, el programa evita a propósito los comportamientos que disparan la heurística de
+Defender: **no enumera ni mata procesos**, no toca el registro, no se copia a ningún sitio y no
+descarga ejecutables. Lo único externo que lanza es un `powershell -NoProfile -Command
+Get-Clipboard` para leer tu `/simc` cuando eliges la opción 1 — solo lectura del portapapeles.
+
+Si tu antivirus aun así se pone pesado, la alternativa es no usar el `.exe`: clona el repo,
+`npm install` y `node run.mjs`, que es exactamente el mismo programa sin empaquetar.
 
 ## Aviso sobre las credenciales
 
