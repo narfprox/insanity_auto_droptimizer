@@ -351,7 +351,7 @@ async function optionsMenu() {
   }
 }
 
-async function mainMenu(context, page, session) {
+async function mainMenu(session) {
   while (true) {
     const profiles = selectedProfiles()
     log('\n==========================================')
@@ -371,14 +371,17 @@ async function mainMenu(context, page, session) {
     log('  0) Salir')
     const opcion = await prompt('> ')
 
+    // El navegador solo se abre para la accion concreta y se cierra al volver
+    // al menu: asi no queda ningun proceso suelto mientras se piensa que hacer.
     if (opcion === '1') {
       const entry = await simcFromClipboard()
-      if (entry) await offerUpload(await launch(context, page, [entry], profiles))
+      if (entry) await withBrowser(async ({ context, page }) => offerUpload(await launch(context, page, [entry], profiles)))
     } else if (opcion === '2') {
       const files = simcFilesFromDisk()
       if (!files.length) { log('\nNo hay ficheros .simc en la carpeta simc/.'); continue }
       log(`\n${files.length} fichero(s): ${files.map((f) => path.basename(f)).join(', ')}`)
-      await offerUpload(await launch(context, page, readCharacters(files), profiles))
+      const characters = readCharacters(files)
+      await withBrowser(async ({ context, page }) => offerUpload(await launch(context, page, characters, profiles)))
     } else if (opcion === '3') {
       await profilesMenu()
     } else if (opcion === '4') {
@@ -386,68 +389,105 @@ async function mainMenu(context, page, session) {
     } else if (opcion === '5') {
       await wowutilsMenu()
     } else if (opcion === '6') {
-      session = await accountMenu(context, session)
+      session = await withBrowser(({ context }) => accountMenu(context, session))
     } else if (opcion === '0' || opcion === '') {
       return
     }
   }
 }
 
+// ---------------------------------------------------------------- navegador
+
+/*
+ * El navegador se abre solo cuando hace falta y se cierra en cuanto termina la
+ * accion. Mientras el menu esta en pantalla no hay ningun proceso de Edge vivo,
+ * asi que no se queda nada colgado ni bloqueando la carpeta .browser-profile.
+ */
+let open = null
+
+async function withBrowser(fn) {
+  if (!open) {
+    const context = await launchContext({ headless: !opts.headed })
+    context.setDefaultTimeout(60000)
+    open = { context, page: context.pages()[0] || (await context.newPage()) }
+  }
+  try {
+    return await fn(open)
+  } finally {
+    await closeBrowser()
+  }
+}
+
+async function closeBrowser() {
+  if (!open) return
+  const { context } = open
+  open = null
+  await context.close().catch(() => { /* si ya estaba cerrado, da igual */ })
+}
+
+// Ctrl+C o cerrar la ventana matan el proceso sin pasar por los finally: sin
+// esto, Edge se queda vivo agarrando la carpeta del perfil.
+let cerrando = false
+for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+  process.on(senal, () => {
+    if (cerrando) return
+    cerrando = true
+    log('\nCerrando el navegador...')
+    closeBrowser().finally(() => process.exit(130))
+  })
+}
+
 // ---------------------------------------------------------------- main
 
 async function main() {
   fs.mkdirSync(opts.out, { recursive: true })
-  const context = await launchContext({ headless: !opts.headed })
-  context.setDefaultTimeout(60000)
-  const page = context.pages()[0] || (await context.newPage())
 
-  try {
-    // --login: entrar a mano en el navegador (por si falla el login por API).
-    if (opts.login) {
+  // --login: entrar a mano en el navegador (por si falla el login por API).
+  if (opts.login) {
+    return withBrowser(async ({ context, page }) => {
       await page.goto(`${BASE}/simbot/droptimizer`, { waitUntil: 'domcontentloaded' })
       log('\nInicia sesion en la ventana del navegador (boton LOGIN, arriba a la izquierda).')
       await prompt('Cuando hayas entrado, pulsa Enter aqui para guardar la sesion... ')
       log(`Sesion guardada: ${(await describeSession(context)).text}`)
       return 0
-    }
+    })
+  }
 
-    let session = await describeSession(context)
-    session = await ensureLogin(context, session)
-
-    if (opts.menu) {
+  if (opts.menu) {
+    let session = await withBrowser(async ({ context }) => {
+      const actual = await ensureLogin(context, await describeSession(context))
       // Primera vez sin credenciales: se piden antes de nada.
-      if (session.anonymous && !readAccount()) {
-        log('\nPrimera vez por aqui. Entra con la cuenta de Raidbots de la guild.')
+      if (actual.anonymous && !readAccount()) {
+        log('\nPrimera vez por aqui. Entra con tu cuenta de Raidbots.')
         log('(Enter en blanco para seguir en anonimo: funciona, pero la cola es mas lenta.)')
-        const nueva = await loginWizard(context)
-        if (nueva) session = nueva
+        return (await loginWizard(context)) || actual
       }
-      await mainMenu(context, page, session)
-      return 0
-    }
+      return actual
+    })
+    await mainMenu(session)
+    return 0
+  }
 
+  const files = simcFilesFromDisk()
+  if (!files.length) {
+    log('\nNo hay ficheros .simc. Pega el string del addon SimC en simc/<nombre>.simc')
+    return 1
+  }
+  const characters = readCharacters(files)
+
+  const results = await withBrowser(async ({ context, page }) => {
+    const session = await ensureLogin(context, await describeSession(context))
     log(`\nCuenta de Raidbots: ${session.text}`)
     if (session.anonymous) log('  (para entrar con tu cuenta, ejecuta el programa sin argumentos y usa el menu)')
+    return launch(context, page, characters, selectedProfiles())
+  })
 
-    const files = simcFilesFromDisk()
-    if (!files.length) {
-      log('\nNo hay ficheros .simc. Pega el string del addon SimC en simc/<nombre>.simc')
-      return 1
-    }
-    const results = await launch(context, page, readCharacters(files), selectedProfiles())
-    if (opts.import) {
-      const creds = readWowutils()
-      if (!creds) {
-        log('\n--import: falta la configuracion de WoWUtils (variables de entorno o wowutils-account.json).')
-      } else {
-        await uploadToWowutils(importableFrom(results))
-      }
-    }
-    const failed = results.filter((r) => r.state !== 'complete' && r.state !== 'dry-run' && !(opts.noWait && r.url))
-    return failed.length ? 1 : 0
-  } finally {
-    await context.close()
+  if (opts.import) {
+    if (!readWowutils()) log('\n--import: falta la configuracion de WoWUtils (variables de entorno o wowutils-account.json).')
+    else await uploadToWowutils(importableFrom(results))
   }
+  const failed = results.filter((r) => r.state !== 'complete' && r.state !== 'dry-run' && !(opts.noWait && r.url))
+  return failed.length ? 1 : 0
 }
 
 // Sin top-level await: asi se puede empaquetar como ejecutable (Node SEA usa CommonJS).
@@ -457,6 +497,7 @@ main()
     return 1
   })
   .then(async (code) => {
+    await closeBrowser()
     // En el menu el usuario ya ha elegido salir; solo se pausa si algo fallo.
     if (opts.pause && (!opts.menu || code !== 0)) await prompt('\nPulsa Enter para cerrar... ')
     process.exit(code)

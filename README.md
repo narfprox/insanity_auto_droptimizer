@@ -169,6 +169,24 @@ desconocido"** la primera vez: *Más información* → *Ejecutar de todas formas
 
 No lances tandas masivas en paralelo: la cola de Raidbots es un recurso compartido y de verdad.
 
+## Procesos del navegador
+
+El navegador **solo se abre para la acción concreta** (comprobar la sesión, lanzar una tanda,
+hacer login) y se cierra en cuanto termina: mientras el menú está en pantalla no hay ningún
+proceso de Edge/Chrome vivo, así que la carpeta no queda bloqueada y puedes borrarla o moverla.
+
+Además se cierra el navegador al recibir Ctrl+C o al cerrar la ventana, y si al arrancar la
+carpeta `.browser-profile` estuviera bloqueada por algo que quedó suelto de una ejecución
+anterior, se cierra **solo lo que use esa carpeta** (nunca tu Edge normal) y se reintenta.
+
+Si alguna vez quieres limpiarlo a mano:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" |
+  Where-Object { $_.CommandLine -like '*browser-profile*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
 ## Aviso sobre las credenciales
 
 Si guardas la contraseña, va en `raidbots-account.json` **en texto plano**, al lado del
