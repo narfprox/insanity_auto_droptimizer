@@ -1,5 +1,5 @@
 {
-  "name": "insanity-droptimizer",
+  "name": "insanity-auto-droptimizer",
   "version": "1.0.0",
   "description": "Lanza los droptimizers de Raidbots desde un string SimC y los importa en WoWUtils",
   "type": "module",
@@ -20,6 +20,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/narfprox/insanity-droptimizer.git"
+    "url": "https://github.com/narfprox/insanity_auto_droptimizer.git"
   }
 }
