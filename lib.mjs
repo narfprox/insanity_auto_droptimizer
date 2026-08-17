@@ -518,20 +518,13 @@ async function setCheckbox(page, name, wanted) {
   if (after !== wanted) throw new Error(`No se pudo poner la casilla "${name}" a ${wanted}`)
 }
 
-/**
- * El export del addon trae la linea del loot spec COMENTADA ("# loot_spec=x").
- * Sin ella Raidbots se queda con el loot spec de la vez anterior, que es quien
- * decide que items entran en el droptimizer: si simulas una spec y luego otra,
- * la segunda sale con los items de la primera. Se descomenta al vuelo.
+/*
+ * Nota para el yo del futuro: NO descomentar la linea "# loot_spec=..." del
+ * export del addon. Raidbots la rechaza ("Invalid commands (not valid Raidbots
+ * options)") y deja de dejarte enviar el sim. Ademas no hace falta: el loot spec
+ * sigue solo a la spec del personaje que se carga, comprobado cargando
+ * assassination -> subtlety -> assassination sobre el mismo perfil.
  */
-export function conLootSpec(simc) {
-  if (/^loot_spec=/m.test(simc)) return simc
-  const comentado = simc.match(/^#\s*loot_spec=(\w+)\s*$/m)
-  if (comentado) return simc.replace(/^#\s*loot_spec=\w+\s*$/m, `loot_spec=${comentado[1]}`)
-  const spec = (simc.match(/^spec=(\w+)/m) || [])[1]
-  return spec ? simc.replace(/^spec=(\w+)\s*$/m, `spec=$1
-loot_spec=${spec}`) : simc
-}
 
 /** Carga el personaje pegando el SimC en el editor (CodeMirror). */
 export async function loadCharacter(page, simc) {
@@ -546,7 +539,7 @@ export async function loadCharacter(page, simc) {
   const focused = await page.evaluate(() => !!document.activeElement?.closest('.cm-content'))
   if (!focused) throw new Error('No se pudo enfocar el editor SimC')
   await page.keyboard.press('ControlOrMeta+a')
-  await page.keyboard.insertText(conLootSpec(simc))
+  await page.keyboard.insertText(simc)
   // Con el personaje cargado aparece la seccion de fuentes de loot.
   // Ojo: el DOM pone "Sources"; las mayusculas son solo CSS.
   await page.getByText(/^sources$/i).first().waitFor({ state: 'visible', timeout: 60000 })

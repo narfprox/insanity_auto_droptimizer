@@ -1,12 +1,17 @@
 node_modules/
 .build/
 dist/
+.env
+
+# Todo lo que el programa genera o guarda vive aqui: perfiles de navegador con
+# cookies de sesion, credenciales, SimC personales y resultados. NUNCA al repo.
+datos/
 out/
-.browser-profile/
+simc/*.simc
 config.json
 raidbots-account.json
-.env
-simc/*.simc
+wowutils-account.json
+.browser-profile/
 .ui-profile/
 ventanas.log
 .lock
