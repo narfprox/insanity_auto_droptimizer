@@ -201,6 +201,16 @@ export async function arrancarUI({ puerto = 0, abrir = true } = {}) {
       return res.end(fs.readFileSync(icono))
     }
 
+    // Un gif al azar en cada arranque de la ventana. Sin cachear, que si no
+    // Chrome se queda con el primero para siempre.
+    if (url.pathname === '/didop.gif') {
+      const cual = Math.random() < 0.5 ? 'didop-1.gif' : 'didop-2.gif'
+      const gif = [path.join(HERE, 'assets', cual), path.join(HERE, cual)].find((f) => fs.existsSync(f))
+      if (!gif) return res.writeHead(404).end()
+      res.writeHead(200, { 'Content-Type': 'image/gif', 'Cache-Control': 'no-store' })
+      return res.end(fs.readFileSync(gif))
+    }
+
     if (url.pathname === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
       return res.end(PAGINA)

@@ -35,6 +35,11 @@ export const PAGINA = /* html */ `<!doctype html>
     font: 12px/1.45 Consolas, monospace;
   }
   textarea:focus, input:focus, select:focus { outline: 2px solid var(--morado2); outline-offset: -1px; }
+  .didop {
+    display: block; margin: 0 auto 12px; max-width: 100%; max-height: 150px;
+    border-radius: 8px; border: 1px solid var(--borde);
+  }
+  .didop[hidden] { display: none; }
   .personaje { margin-top: 8px; font-size: 13px; color: var(--suave); min-height: 20px; }
   .personaje b { color: var(--morado); }
   label.check { display: flex; align-items: center; gap: 9px; padding: 5px 0; cursor: pointer; }
@@ -116,6 +121,7 @@ export const PAGINA = /* html */ `<!doctype html>
 
   <section class="panel">
     <h2>Progreso</h2>
+    <img class="didop" id="didop" alt="" hidden>
     <div id="consola">Listo cuando quieras.</div>
   </section>
 
@@ -291,6 +297,11 @@ eventos.onmessage = (ev) => {
   if (d.tipo === 'estado') {
     $('lanzar').disabled = d.corriendo
     $('lanzar').textContent = d.corriendo ? 'Simulando…' : 'Lanzar droptimizers'
+    // El gif hace de "cargando": solo mientras hay tanda, y se sortea uno nuevo
+    // en cada lanzamiento (el parametro evita que Chrome reutilice el anterior).
+    const didop = $('didop')
+    if (d.corriendo) { didop.src = '/didop.gif?' + Date.now(); didop.hidden = false }
+    else { didop.hidden = true; didop.removeAttribute('src') }
     if (d.corriendo && d.personaje) escribir('Lanzando ' + d.personaje)
   }
 }

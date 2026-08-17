@@ -125,8 +125,13 @@ await inject(EXE, 'NODE_SEA_BLOB', fs.readFileSync(path.join(BUILD, 'sea-prep.bl
 // 4. Extras que acompañan al .exe.
 console.log('4/4  extras...')
 fs.copyFileSync(path.join(HERE, 'profiles.json'), path.join(DIST, 'profiles.json'))
-// El icono de la ventana de la interfaz grafica.
+// El icono de la ventana de la interfaz grafica...
 if (logo) fs.copyFileSync(logo, path.join(DIST, 'pulpo.png'))
+// ...y los gifs que salen dentro de ella.
+for (const gif of ['didop-1.gif', 'didop-2.gif']) {
+  const origen = path.join(HERE, 'assets', gif)
+  if (fs.existsSync(origen)) fs.copyFileSync(origen, path.join(DIST, gif))
+}
 
 // La cuenta compartida viaja como fichero al lado del .exe (no dentro del binario):
 // asi se cambia la contraseña sin recompilar nada.
