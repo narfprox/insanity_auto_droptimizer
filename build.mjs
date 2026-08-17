@@ -182,8 +182,12 @@ para copiarlas a mano y no te vuelve a preguntar.
 
 REQUISITOS
 ----------
-Tener instalado Microsoft Edge o Google Chrome. Nada mas: no hace falta
-instalar Node, ni npm, ni descargar navegadores.
+Tener instalado Google Chrome. Nada mas: no hace falta instalar Node, ni npm,
+ni descargar navegadores.
+
+Si no tienes Chrome funciona con Edge, pero Windows 11 mete las pestañas de Edge
+en el Alt+Tab y veras entradas sueltas con la miniatura en blanco. Se quitan en
+Configuracion -> Sistema -> Multitarea -> Alt+Tab -> "Solo ventanas abiertas".
 
 DESDE TERMINAL (opcional)
 -------------------------

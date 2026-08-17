@@ -10,8 +10,8 @@ un JSON que se edita sin tocar código.
 ## Descarga (Windows, sin instalar nada)
 
 Coge el ZIP de la [última release](../../releases/latest), descomprime y doble clic en
-`Droptimizer.exe`. No necesita Node, ni npm, ni descargar navegadores: usa el **Microsoft Edge
-o Google Chrome** que ya tienes instalado.
+`Droptimizer.exe`. No necesita Node, ni npm, ni descargar navegadores: usa el **Google Chrome**
+que ya tienes instalado (si no lo hay, tira de Edge).
 
 ```
 1. En el juego:  /simc   y copia el texto (Ctrl+C)
@@ -168,6 +168,24 @@ firma de `node.exe` deja de ser válida, **Windows SmartScreen puede avisar de "
 desconocido"** la primera vez: *Más información* → *Ejecutar de todas formas*.
 
 No lances tandas masivas en paralelo: la cola de Raidbots es un recurso compartido y de verdad.
+
+## Qué navegador usa, y por qué Chrome primero
+
+Usa el navegador ya instalado, en este orden: **Chrome → Edge → Chromium**. No es capricho:
+Windows 11 publica en Alt+Tab **las pestañas de Edge** (ajuste *Alt+Tab: ventanas y las 20
+pestañas más recientes*), y las pestañas de la automatización headless aparecen ahí como
+entradas con la miniatura en blanco que se van acumulando hasta 20. Medido:
+
+| Navegador | Ventana que crea en headless |
+|-----------|------------------------------|
+| Edge | una oculta, titulada `... and 4 more pages - Personal - Microsoft Edge` → sus pestañas salen en Alt+Tab |
+| Chrome | ninguna con título → no hay nada que publicar |
+
+Si en tu PC solo hay Edge, el programa funciona igual y te avisa: se quita poniendo
+*Configuración → Sistema → Multitarea → Alt+Tab* en **"Solo ventanas abiertas"**.
+
+Esas entradas no son procesos ni ventanas de verdad: no se pueden "cerrar", y se limpian
+reiniciando el Explorador de Windows.
 
 ## Procesos del navegador
 

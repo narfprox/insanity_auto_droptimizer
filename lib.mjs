@@ -304,11 +304,18 @@ export function latestResultsFile(outDir) {
  * usuario. Ver README, apartado "Procesos del navegador".
  */
 
-/** Usa el Edge/Chrome ya instalado: no hace falta descargar Chromium. */
+/**
+ * Usa el Chrome/Edge ya instalado: no hace falta descargar Chromium.
+ *
+ * Chrome va primero a proposito. Windows 11 publica en Alt+Tab las pestañas de
+ * Edge (ajuste "Alt+Tab: ventanas y las 20 pestañas mas recientes"), y las
+ * pestañas de nuestra automatizacion headless aparecen ahi como entradas con la
+ * miniatura en blanco que se van acumulando. Chrome no se integra con eso.
+ */
 export async function launchContext({ headless = true } = {}) {
   const channels = process.env.RB_BROWSER_CHANNEL
     ? [process.env.RB_BROWSER_CHANNEL]
-    : ['msedge', 'chrome', 'chromium']
+    : ['chrome', 'msedge', 'chromium']
   const common = {
     headless,
     viewport: { width: 1500, height: 1000 },
@@ -317,7 +324,12 @@ export async function launchContext({ headless = true } = {}) {
   let lastErr
   for (const channel of channels) {
     try {
-      return await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
+      const context = await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
+      if (channel === 'msedge') {
+        log('  (usando Edge porque no encuentro Chrome: si te salen pestañas sueltas en Alt+Tab,')
+        log('   ponlo en Configuracion → Sistema → Multitarea → Alt+Tab → "Solo ventanas abiertas")')
+      }
+      return context
     } catch (e) { lastErr = e }
   }
   if (process.env.RB_EXECUTABLE_PATH) {
