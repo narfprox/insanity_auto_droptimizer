@@ -328,17 +328,54 @@ export async function launchContext({ headless = true } = {}) {
     viewport: { width: 1500, height: 1000 },
     args: ['--disable-blink-features=AutomationControlled'],
   }
-  let lastErr
-  for (const channel of channels) {
-    try {
-      const context = await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
-      if (channel === 'msedge') {
-        log('  (usando Edge porque no encuentro Chrome: si te salen pestañas sueltas en Alt+Tab,')
-        log('   ponlo en Configuracion → Sistema → Multitarea → Alt+Tab → "Solo ventanas abiertas")')
-      }
-      return context
-    } catch (e) { lastErr = e }
+  const fallos = []
+  const intentar = async () => {
+    for (const channel of channels) {
+      try {
+        const context = await chromium.launchPersistentContext(PROFILE_DIR, { ...common, channel })
+        if (channel === 'msedge') {
+          log('  (usando Edge porque no encuentro Chrome: si te salen pestañas sueltas en Alt+Tab,')
+          log('   ponlo en Configuracion → Sistema → Multitarea → Alt+Tab → "Solo ventanas abiertas")')
+        }
+        return context
+      } catch (e) { fallos.push(`${channel}: ${e.message.split('\n')[0]}`) }
+    }
+    return null
   }
+
+  /*
+   * Si falla, lo mas comun no es que el perfil este roto sino que otra copia del
+   * programa lo tenga abierto: Chrome no deja dos procesos con el mismo perfil y
+   * el segundo muere al instante. Se espera y se reintenta antes de tocar nada.
+   */
+  let context = await intentar()
+  for (let intento = 1; !context && intento <= 3; intento++) {
+    await sleep(3000)
+    fallos.length = 0
+    context = await intentar()
+    if (context) log('  (el navegador tardo en soltar el perfil; ya va)')
+  }
+  if (context) return context
+
+  /*
+   * Si el navegador muere nada mas abrir, casi siempre es que la carpeta del
+   * perfil quedo tocada: pasa si se abren dos copias del programa a la vez o si
+   * el proceso murio de mala manera. Se aparta y se empieza con uno limpio; la
+   * sesion de Raidbots se recupera sola si hay credenciales guardadas.
+   */
+  const perfilRoto = fallos.some((f) => /has been closed|Target page|crashed|ProcessSingleton|profile directory|being used|SingletonLock/i.test(f))
+  if (perfilRoto && fs.existsSync(PROFILE_DIR)) {
+    const apartado = `${PROFILE_DIR}-roto-${Date.now()}`
+    try {
+      fs.renameSync(PROFILE_DIR, apartado)
+      log('  el perfil del navegador estaba tocado: se empieza con uno limpio')
+      log(`  (el anterior queda en ${path.basename(apartado)}, se puede borrar)`)
+      context = await intentar()
+      if (context) return context
+    } catch { /* si ni se puede apartar, se cae al error de abajo */ }
+  }
+
+  const lastErr = { message: fallos.join(' | ') }
   if (process.env.RB_EXECUTABLE_PATH) {
     return chromium.launchPersistentContext(PROFILE_DIR, { ...common, executablePath: process.env.RB_EXECUTABLE_PATH })
   }
@@ -572,6 +609,10 @@ export async function submitWithRetry(page, { tag }) {
       return await submit(page)
     } catch (e) {
       lastError = e
+      // Si el navegador se ha muerto, reintentar no arregla nada: mejor decirlo.
+      if (/has been closed|Target (page|closed)|crashed/i.test(e.message)) {
+        throw new Error('el navegador se cerro a mitad del envio (¿otra copia del programa abierta?)')
+      }
       const queued = TOO_MANY_SIMS.test(e.message)
       // Errores de verdad: 3 intentos. Cola: hasta 30 (unos 15 minutos).
       if (!queued && i >= 3) break

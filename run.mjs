@@ -450,6 +450,31 @@ for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
 
 // ---------------------------------------------------------------- main
 
+/*
+ * Dos copias del programa sobre la misma carpeta se pisan: Chrome no permite dos
+ * procesos con el mismo perfil y el segundo muere nada mas abrir, con lo que la
+ * tanda se queda a medias. Se avisa, pero no se bloquea: un cerrojo olvidado no
+ * puede dejar a nadie sin poder usarlo.
+ */
+const CERROJO = path.join(HERE, '.lock')
+
+function otraCopiaAbierta() {
+  try {
+    const previo = Number(fs.readFileSync(CERROJO, 'utf8'))
+    if (previo && previo !== process.pid) {
+      try { process.kill(previo, 0); return previo } catch { /* ese proceso ya no existe */ }
+    }
+  } catch { /* no habia cerrojo */ }
+  try { fs.writeFileSync(CERROJO, String(process.pid)) } catch { /* da igual */ }
+  return null
+}
+
+function soltarCerrojo() {
+  try {
+    if (Number(fs.readFileSync(CERROJO, 'utf8')) === process.pid) fs.rmSync(CERROJO, { force: true })
+  } catch { /* da igual */ }
+}
+
 async function main() {
   fs.mkdirSync(opts.out, { recursive: true })
 
@@ -476,6 +501,11 @@ async function main() {
       return 0
     }
 
+    const otra = otraCopiaAbierta()
+    if (otra) {
+      log(`AVISO: parece que ya hay otra copia del programa abierta (PID ${otra}) en esta carpeta.`)
+      log('Si algo falla a mitad de una tanda, cierra una de las dos.')
+    }
     log('Abriendo la ventana...')
     const { abierta, direccion } = await arrancarUI({})
     if (abierta) return 0
@@ -542,6 +572,7 @@ main()
   })
   .then(async (code) => {
     await closeBrowser()
+    soltarCerrojo()
     /*
      * Tras el menu o la ventana el usuario ya ha decidido salir; solo se pausa
      * si algo fallo o si venia de una ejecucion directa con flags. En el proceso

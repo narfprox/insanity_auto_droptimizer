@@ -9,3 +9,4 @@ raidbots-account.json
 simc/*.simc
 .ui-profile/
 ventanas.log
+.lock
