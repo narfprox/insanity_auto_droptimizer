@@ -159,8 +159,16 @@ MENU
   1) Pegar mi SimC y lanzar        <- lo normal
   2) Lanzar los SimC guardados     <- para varios personajes de golpe
   3) Elegir que perfiles lanzar    <- Normal / HC / Mythic / M+ / Vault
-  4) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
+  4) Cuantos sims a la vez         <- ponlo en "todos a la vez" y tardas mucho menos
+  5) Cuenta de Raidbots            <- entrar, cambiar o cerrar sesion
   0) Salir
+
+SIMS EN PARALELO
+----------------
+Con la opcion 4 puedes lanzar los 5 perfiles a la vez en lugar de uno detras de
+otro. El limite lo pone Raidbots: una cuenta solo puede tener unos cuantos sims
+corriendo a la vez (1 si no tiene Premium). Si te pasas, no se pierde nada: esa
+pestaña espera su turno y entra cuando queda hueco.
 
 REQUISITOS
 ----------

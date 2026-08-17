@@ -39,7 +39,7 @@ const opts = {
   login: has('login'),
   dryRun: has('dry-run'),
   noWait: has('no-wait'),
-  concurrency: flag('concurrency', '1'),
+  concurrency: flag('concurrency'),
   timeoutMin: Number(flag('timeout-min', 25)),
   help: has('help') || has('h'),
   // Al abrirlo con doble clic no hay argumentos: se abre el menu.
@@ -81,13 +81,24 @@ function readCharacters(files) {
   })
 }
 
+/**
+ * Cuantas pestañas trabajan a la vez. "auto" = todas las tareas de golpe (con
+ * tope 5): si la cuenta no da para tanto, Raidbots va rechazando y cada pestaña
+ * espera su hueco, asi que el limite real lo marca Raidbots, no una config.
+ */
+function resolveWorkers(taskCount) {
+  const raw = typeof opts.concurrency === 'string' && opts.concurrency !== 'true'
+    ? opts.concurrency
+    : loadConfig().concurrency || '1'
+  const workers = raw === 'auto' ? Math.min(taskCount, 5) : Math.max(1, Number(raw) || 1)
+  return Math.min(workers, taskCount)
+}
+
 /** Lanza una tanda y escribe los resultados. */
-async function launch(context, page, characters, profiles, session) {
+async function launch(context, page, characters, profiles) {
   const tasks = buildTasks(characters, profiles)
-  const workers = opts.concurrency === 'auto'
-    ? Math.max(1, session.concurrentSimLimit || 1)
-    : Math.max(1, Number(opts.concurrency) || 1)
-  log(`\n${tasks.length} sim(s), ${Math.min(workers, tasks.length)} en paralelo`)
+  const workers = resolveWorkers(tasks.length)
+  log(`\n${tasks.length} sim(s), ${workers} en paralelo`)
   log('Esto tarda unos minutos. Puedes minimizar la ventana.\n')
 
   const results = await runTasks(context, page, tasks, {
@@ -189,33 +200,56 @@ async function profilesMenu() {
   }
 }
 
+async function concurrencyMenu() {
+  const config = loadConfig()
+  log('\n--- Sims a la vez ---')
+  log('Raidbots limita cuantos sims puede tener corriendo una cuenta a la vez.')
+  log('Si te pasas, las pestañas de sobra esperan su turno solas (no fallan).')
+  log('  1) De uno en uno            (lo mas prudente)')
+  log('  2) 2 a la vez')
+  log('  3) 3 a la vez')
+  log('  4) Todos a la vez (hasta 5) — recomendado con Premium')
+  log('  0) Volver sin cambiar')
+  const opcion = await prompt('> ')
+  const valores = { 1: '1', 2: '2', 3: '3', 4: 'auto' }
+  const elegido = valores[opcion]
+  if (!elegido) return
+  saveConfig({ ...config, concurrency: elegido })
+  log(`Guardado: ${elegido === 'auto' ? 'todos a la vez (hasta 5)' : `${elegido} a la vez`}.`)
+}
+
 async function mainMenu(context, page, session) {
   while (true) {
     const profiles = selectedProfiles()
     log('\n==========================================')
     log('   INSANITY · DROPTIMIZERS DE RAIDBOTS')
     log('==========================================')
+    const workers = resolveWorkers(profiles.length)
     log(`Cuenta:   ${session.text}`)
     log(`Perfiles: ${profiles.length} de ${allProfiles.length} (${profiles.map((p) => p.key).join(', ')})`)
+    log(`En paralelo: ${workers === 1 ? 'de uno en uno' : `${workers} a la vez`}`)
     log('')
     log('  1) Pegar mi SimC y lanzar   (lo coge del portapapeles)')
     log('  2) Lanzar los SimC guardados en la carpeta simc/')
     log('  3) Elegir que perfiles lanzar')
-    log('  4) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)')
+    log('  4) Cuantos sims a la vez')
+    log('  5) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)')
     log('  0) Salir')
     const opcion = await prompt('> ')
 
     if (opcion === '1') {
       const entry = await simcFromClipboard()
-      if (entry) await launch(context, page, [entry], profiles, session)
+      if (entry) await launch(context, page, [entry], profiles)
     } else if (opcion === '2') {
       const files = simcFilesFromDisk()
       if (!files.length) { log('\nNo hay ficheros .simc en la carpeta simc/.'); continue }
       log(`\n${files.length} fichero(s): ${files.map((f) => path.basename(f)).join(', ')}`)
-      await launch(context, page, readCharacters(files), profiles, session)
+      await launch(context, page, readCharacters(files), profiles)
     } else if (opcion === '3') {
       await profilesMenu()
     } else if (opcion === '4') {
+      await concurrencyMenu()
+    } else if (opcion === '5') {
       session = await accountMenu(context, session)
     } else if (opcion === '0' || opcion === '') {
       return
@@ -264,7 +298,7 @@ async function main() {
       log('\nNo hay ficheros .simc. Pega el string del addon SimC en simc/<nombre>.simc')
       return 1
     }
-    const results = await launch(context, page, readCharacters(files), selectedProfiles(), session)
+    const results = await launch(context, page, readCharacters(files), selectedProfiles())
     const failed = results.filter((r) => r.state !== 'complete' && r.state !== 'dry-run' && !(opts.noWait && r.url))
     return failed.length ? 1 : 0
   } finally {

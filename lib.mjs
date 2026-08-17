@@ -365,20 +365,32 @@ async function submit(page) {
   return { simId, url: `${BASE}/simbot/report/${simId}` }
 }
 
+/** Raidbots limita los sims simultaneos por cuenta y lo dice con este mensaje. */
+const TOO_MANY_SIMS = /too many sims/i
+
 /**
- * Con la cuenta compartida de la guild puede haber varios lanzando a la vez y
- * Raidbots rechaza por limite de sims simultaneos: se reintenta con espera.
+ * Lanza el sim reintentando. Si el rechazo es por limite de sims simultaneos no
+ * es un fallo: es cola. Se espera poco y muchas veces, sin llenar la pantalla.
+ * Cualquier otro error se reintenta pocas veces y acaba propagandose.
  */
-export async function submitWithRetry(page, { tag, attempts = 3, waitMs = 60_000 }) {
+export async function submitWithRetry(page, { tag }) {
   let lastError
-  for (let i = 1; i <= attempts; i++) {
+  let queuedNotice = false
+  for (let i = 1; i <= 30; i++) {
     try {
       return await submit(page)
     } catch (e) {
       lastError = e
-      if (i === attempts) break
-      log(`${tag} rechazado (${e.message.slice(0, 120)}) — reintento ${i + 1}/${attempts} en ${waitMs / 1000}s`)
-      await sleep(waitMs)
+      const queued = TOO_MANY_SIMS.test(e.message)
+      // Errores de verdad: 3 intentos. Cola: hasta 30 (unos 15 minutos).
+      if (!queued && i >= 3) break
+      if (queued) {
+        if (!queuedNotice) { log(`${tag} en cola: la cuenta ya tiene otros sims corriendo, esperando hueco...`); queuedNotice = true }
+        await sleep(30_000)
+      } else {
+        log(`${tag} rechazado (${e.message.slice(0, 120)}) — reintento ${i + 1}/3 en 60s`)
+        await sleep(60_000)
+      }
     }
   }
   throw lastError

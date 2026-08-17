@@ -34,9 +34,21 @@ Perfiles: 5 de 5 (raid-normal, raid-heroic, raid-mythic, mplus-10, mplus-vault-1
   1) Pegar mi SimC y lanzar   (lo coge del portapapeles)
   2) Lanzar los SimC guardados en la carpeta simc/
   3) Elegir que perfiles lanzar
-  4) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)
+  4) Cuantos sims a la vez
+  5) Cuenta de Raidbots (entrar / cambiar / cerrar sesion)
   0) Salir
 ```
+
+### Lanzar los perfiles en paralelo
+
+Opción **4** del menú (o `--concurrency`): cada sim va en su propia pestaña, así que los 5
+perfiles pueden salir a la vez en lugar de uno detrás de otro.
+
+El tope real lo pone Raidbots, no esta herramienta: una cuenta solo puede tener un número
+limitado de sims corriendo a la vez (1 sin Premium) y contesta
+*"You are running too many sims at once"*. Cuando eso pasa **no se pierde el sim**: esa pestaña
+se queda esperando hueco y lo reintenta cada 30 s hasta 15 minutos. O sea que poner "todos a la
+vez" nunca rompe nada; simplemente irán entrando al ritmo que permita la cuenta.
 
 ## Desde el código
 
@@ -57,7 +69,7 @@ npm run build                                    # genera dist/Droptimizer.exe
 | `--headed` | Muestra el navegador en vez de ir en silencio |
 | `--dry-run` | Configura todo pero **no** lanza los sims |
 | `--no-wait` | Envía los sims y devuelve las URLs sin esperar a que terminen |
-| `--concurrency <n\|auto>` | Sims simultáneos. `auto` = el límite que dé tu cuenta |
+| `--concurrency <n\|auto>` | Sims simultáneos. `auto` = todos a la vez (hasta 5) |
 | `--timeout-min <n>` | Minutos máximos de espera por sim (por defecto 25) |
 
 ## Perfiles
