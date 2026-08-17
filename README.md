@@ -59,21 +59,29 @@ salgan con el modelo más al día, y la fija **siempre de forma explícita** par
 de lo que quedara elegido la vez anterior. Se cambia en la opción 4 del menú o con
 `--simc-version weekly`.
 
-### Subir a WoWUtils desde el propio programa
+### Subir a WoWUtils desde el propio programa (opcional)
 
-Al terminar una tanda pregunta si quieres subir las URLs al grupo, y la opción **5** del menú
-sube la última tanda cuando quieras. La primera vez pide la API key del grupo
-(*Group settings → API sharing*) y el id del grupo, que sale en la URL de wowutils.com; se
-guardan en `wowutils-account.json` y no vuelve a preguntar.
+**Es una función opcional y sirve para cualquier grupo de WoWUtils, no solo el de una guild
+concreta.** Si no configuras nada, el programa hace su trabajo y te deja las URLs; no te
+molesta con ello.
+
+Si tienes (o te pasan) la API key de un grupo, la opción **5** del menú la pide una vez, la
+valida contra la API, la guarda en `wowutils-account.json` y a partir de ahí: al terminar cada
+tanda te pregunta si subir las URLs, y desde esa misma opción puedes subir la última tanda
+cuando quieras.
+
+Los datos que hacen falta los da un admin del grupo: la key está en *Group settings → API
+sharing* y el id del grupo sale en la URL `wowutils.com/viserio-cooldowns/groups/<ID>`.
 
 Cada import cuesta 5 puntos del presupuesto por hora del grupo; si se agota, espera al reset en
 vez de encadenar errores. Los `profileKey` que manda (`normal-max`, `heroic-max`, `mythic-max`,
 `mplus-drops`, `mplus-vault`) los normaliza WoWUtils, y si alguno no le gustara se reintenta sin
 él para que lo deduzca del propio report.
 
-> ⚠️ La API key da acceso de **lectura y escritura a todo el grupo**. Si repartes el ZIP con
-> `wowutils-account.json` dentro, todo el mundo puede escribir en el grupo. Para una guild suele
-> ser mejor que solo la configuren los oficiales, y que el resto pase las URLs.
+> ⚠️ La API key da acceso de **lectura y escritura a todo el grupo**, y WoWUtils solo tiene una
+> key por grupo (no hay keys por persona). Por eso el programa **nunca la trae dentro**: la pone
+> quien la tiene. Compártela solo con quien quieras que pueda escribir en el grupo; si se te va
+> de las manos, se regenera en *Group settings → API sharing*.
 
 ## Desde el código
 

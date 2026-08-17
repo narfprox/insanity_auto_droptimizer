@@ -172,12 +172,13 @@ solo puede tener unos cuantos sims corriendo a la vez. Si te pasas no se pierde
 nada, esa pestaña espera su turno y entra cuando queda hueco. En la opcion 4
 puedes bajarlo si prefieres ir mas suave.
 
-SUBIR A WOWUTILS
-----------------
-Al terminar te pregunta si quieres subir las URLs al grupo. La primera vez te
-pide la API key del grupo (Group settings -> API sharing) y el id del grupo, que
-sale en la URL de wowutils.com. Se guardan y ya no vuelve a preguntar.
-Tambien esta la opcion 5 del menu para subir la ultima tanda cuando quieras.
+SUBIR A WOWUTILS (opcional)
+---------------------------
+Si tienes la API key de un grupo de WoWUtils, la opcion 5 te la pide una vez y
+luego sube las URLs solo: al acabar cada tanda te pregunta si quieres subirlas.
+La key y el id del grupo te los da un admin del grupo (Group settings -> API
+sharing). Si no tienes key, no pasa nada: el programa te deja igual las URLs
+para copiarlas a mano y no te vuelve a preguntar.
 
 REQUISITOS
 ----------

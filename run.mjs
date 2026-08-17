@@ -219,9 +219,12 @@ async function profilesMenu() {
 /** Pide key + grupo si no estan guardados, y comprueba que funcionan. */
 async function wowutilsWizard() {
   log('\n--- WoWUtils ---')
-  log('Hace falta la API key del grupo (Group settings → API sharing) y el id del')
-  log('grupo, que sale en la URL: wowutils.com/viserio-cooldowns/groups/<ID>')
-  log('Se guardan en este PC. Enter en blanco para cancelar.\n')
+  log('Subir a WoWUtils es opcional: sirve para cualquier grupo, no solo el de la guild.')
+  log('Hacen falta dos cosas, que te da un admin del grupo:')
+  log('  · la API key  (Group settings → API sharing)')
+  log('  · el id del grupo, que sale en la URL:')
+  log('    wowutils.com/viserio-cooldowns/groups/<ID>')
+  log('Se guardan solo en este PC. Enter en blanco para cancelar.\n')
 
   const apiKey = await promptHidden('API KEY: ')
   if (!apiKey) return null
@@ -257,10 +260,18 @@ async function uploadToWowutils(items) {
   if (failed.length) log('Los fallidos se pueden reintentar con la opcion 5 del menu.')
 }
 
-/** Pregunta si subir lo que se acaba de simular. */
+/**
+ * Pregunta si subir lo que se acaba de simular. Subir a WoWUtils es opcional:
+ * a quien no tenga configurada la key no se le pregunta cada vez, solo se le
+ * recuerda que existe la opcion.
+ */
 async function offerUpload(results) {
   const items = importableFrom(results)
   if (!items.length || opts.noWait) return
+  if (!readWowutils()) {
+    log('\n(Si tienes la API key de un grupo de WoWUtils, la opcion 5 del menu sube estas URLs solo.)')
+    return
+  }
   const respuesta = (await prompt(`\n¿Subir estos ${items.length} droptimizer(s) a WoWUtils? [S/n]: `)).toLowerCase()
   if (respuesta === 'n') return
   await uploadToWowutils(items)
