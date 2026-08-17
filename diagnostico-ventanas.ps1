@@ -47,7 +47,12 @@ while ($true) {
     if ($vistas.ContainsKey($hwnd)) { continue }
 
     $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
-    if (-not $proc -or $proc.ProcessName -notmatch 'msedge|chrome|chromium|headless') { continue }
+    if (-not $proc) { continue }
+    # Cualquier navegador, o cualquier ventana que se llame "Droptimizer" aunque
+    # el proceso sea otro: si es algo inesperado, quiero verlo igual.
+    $esNavegador = $proc.ProcessName -match 'msedge|chrome|chromium|headless'
+    $esSospechosa = $titulo -like '*Droptimizer*' -or $titulo -like '*Raidbots*'
+    if (-not $esNavegador -and -not $esSospechosa) { continue }
     $vistas[$hwnd] = $true
 
     $cim = Get-CimInstance Win32_Process -Filter "ProcessId=$procId" -ErrorAction SilentlyContinue
