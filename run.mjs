@@ -44,11 +44,12 @@ const opts = {
   concurrency: flag('concurrency'),
   import: has('import'),
   simcVersion: flag('simc-version'),
-  ui: has('ui'),
+  // Doble clic (sin argumentos) = la ventana con botones. El menu de consola
+  // sigue disponible con --menu, y cualquier otro flag va directo sin interfaz.
+  ui: has('ui') || (args.length === 0 && !has('menu')),
   timeoutMin: Number(flag('timeout-min', 25)),
   help: has('help') || has('h'),
-  // Al abrirlo con doble clic no hay argumentos: se abre el menu.
-  menu: has('menu') || args.length === 0,
+  menu: has('menu'),
   pause: has('pause') || (IS_PACKAGED && !has('no-pause')),
 }
 
@@ -452,11 +453,17 @@ for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
 async function main() {
   fs.mkdirSync(opts.out, { recursive: true })
 
-  // Interfaz grafica: ventana propia con botones, sin consola de por medio.
+  // Interfaz grafica: ventana propia con botones.
   if (opts.ui) {
     const { arrancarUI } = await import('./ui.mjs')
-    await arrancarUI({})
-    return 0
+    log('Abriendo la ventana... (puedes minimizar esta consola)')
+    const { abierta, direccion } = await arrancarUI({})
+    if (abierta) return 0
+    // Sin navegador no hay ventana posible: se cae al menu de consola.
+    log('No encuentro Chrome ni Edge, asi que no puedo abrir la ventana.')
+    log(`Si tienes otro navegador, abre a mano: ${direccion}`)
+    log('Mientras tanto, aqui tienes el menu de siempre.')
+    opts.menu = true
   }
 
   // --login: entrar a mano en el navegador (por si falla el login por API).

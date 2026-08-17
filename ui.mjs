@@ -239,18 +239,17 @@ export async function arrancarUI({ puerto = 0, abrir = true } = {}) {
   const direccion = `http://127.0.0.1:${servidor.address().port}`
   log(`Interfaz en ${direccion}`)
 
-  if (!abrir) return { direccion, servidor }
+  if (!abrir) return { direccion, servidor, abierta: true }
 
   const ventana = abrirVentana(direccion)
   if (!ventana) {
-    log('No encuentro Chrome ni Edge para abrir la ventana.')
-    log(`Abre esta direccion a mano en tu navegador: ${direccion}`)
-    return { direccion, servidor }
+    servidor.close()
+    return { direccion, servidor, abierta: false }
   }
   // Cuando el usuario cierra la ventana, se acaba el programa.
   await new Promise((resolve) => ventana.on('exit', resolve))
   servidor.close()
-  return { direccion, servidor }
+  return { direccion, servidor, abierta: true }
 }
 
 /** Abre la ventana de aplicacion con el navegador instalado (sin pestañas ni barra). */

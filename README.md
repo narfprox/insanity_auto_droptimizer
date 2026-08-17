@@ -16,8 +16,8 @@ que ya tienes instalado (si no lo hay, tira de Edge).
 ```
 1. En el juego:  /simc   y copia el texto (Ctrl+C)
 2. Doble clic en Droptimizer.exe
-3. Opción 1 → lee tu SimC del portapapeles y lanza los sims
-4. Al acabar tienes las URLs en pantalla y en out\urls.txt
+3. Se abre la ventana: pega el SimC, marca perfiles y dale a Lanzar
+4. Al acabar tienes las URLs como enlaces, con botones para copiarlas
 ```
 
 La primera vez pide el email y la contraseña de tu cuenta de Raidbots (se guardan en tu PC y
@@ -42,8 +42,8 @@ Perfiles: 5 de 5 (raid-normal, raid-heroic, raid-mythic, mplus-10, mplus-vault-1
 
 ### Interfaz con botones
 
-`Droptimizer.exe --ui` (o la opción **7** del menú) abre una **ventana de aplicación** con
-botones: pegas el SimC en un cuadro de texto, marcas los perfiles, le das a *Lanzar* y ves el
+**El doble clic abre la ventana**: es lo que sale al ejecutarlo sin argumentos, y el menú de
+consola sigue disponible con `Droptimizer.exe --menu`. En la ventana pegas el SimC en un cuadro de texto, marcas los perfiles, le das a *Lanzar* y ves el
 progreso en vivo y las URLs como enlaces, con botones para copiarlas todas o subirlas a
 WoWUtils.
 

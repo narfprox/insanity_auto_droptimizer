@@ -144,27 +144,22 @@ fs.writeFileSync(path.join(DIST, 'LEEME.txt'), `DROPTIMIZERS DE INSANITY
 COMO SE USA
 -----------
 1. En el juego escribe  /simc  y copia el texto (Ctrl+C).
-2. Doble clic en Droptimizer.exe
-3. Elige la opcion 1 (Pegar mi SimC y lanzar) y pulsa Enter: coge el texto del
-   portapapeles solo, te dice que personaje ha detectado y lanza los sims.
-4. Al terminar tienes las URLs en pantalla y en out\\urls.txt
+2. Doble clic en Droptimizer.exe: se abre la ventana con botones.
+3. Pega el SimC en el cuadro de la izquierda, marca los perfiles que quieras
+   y dale a "Lanzar droptimizers".
+4. Al terminar tienes las URLs como enlaces, con un boton para copiar cada una
+   y otro para copiarlas todas. Tambien quedan en out\\urls.txt
 
-La primera vez te pide el email y la contraseña de la cuenta de Raidbots de la
-guild. Se guardan en este PC y ya no vuelve a preguntar. Si te equivocas o
-cambia la contraseña: opcion 4 del menu (Cuenta de Raidbots).
+Detras de la ventana se queda una consola con el detalle; puedes minimizarla.
+Al cerrar la ventana se cierra el programa.
 
-Si prefieres ir en anonimo, deja el email en blanco y pulsa Enter: funciona
-igual, solo que la cola de Raidbots es mas lenta.
+Para usar la cuenta de Raidbots de la guild: boton "Cuenta" arriba a la derecha.
+Se guarda en este PC y no vuelve a preguntar. Sin cuenta tambien funciona, solo
+que la cola gratuita de Raidbots es mas lenta.
 
-INTERFAZ CON BOTONES
---------------------
-Si prefieres botones a la consola, elige la opcion 7 del menu: se abre una
-ventana donde pegas el SimC, marcas que perfiles quieres y le das a lanzar. Las
-URLs salen como enlaces, con un boton para copiarlas todas y otro para subirlas
-a WoWUtils. Al cerrar la ventana se cierra el programa.
-
-MENU
-----
+MENU DE CONSOLA (para quien lo prefiera)
+---------------------------------------
+Droptimizer.exe --menu
   1) Pegar mi SimC y lanzar        <- lo normal
   2) Lanzar los SimC guardados     <- para varios personajes de golpe
   3) Elegir que perfiles lanzar    <- Normal / HC / Mythic / M+ / Vault
