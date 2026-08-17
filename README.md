@@ -185,6 +185,26 @@ desconocido"** la primera vez: *Más información* → *Ejecutar de todas formas
 
 No lances tandas masivas en paralelo: la cola de Raidbots es un recurso compartido y de verdad.
 
+## Qué hay en la carpeta
+
+Al descomprimir solo se ven tres cosas; todo lo demás vive bajo `datos/`, y lo que el
+programa genera al usarlo también:
+
+```
+Droptimizer.exe
+LEEME.txt
+datos/
+  media/          los gifs y el icono de la ventana
+  profiles.json   qué perfiles de droptimizer existen
+  simc/           los SimC pegados, uno por personaje y spec
+  out/            resultados: urls.txt y el detalle en JSON
+  navegador/      la sesión de Raidbots
+  ventana/        datos internos de la ventana
+```
+
+Quien venga de una versión anterior no pierde nada: la primera vez se mueve solo a `datos/`
+lo que hubiera suelto (sesión, cuenta, configuración y SimC guardados).
+
 ## Qué navegador usa, y por qué Chrome primero
 
 Usa el navegador ya instalado, en este orden: **Chrome → Edge → Chromium**. No es capricho:

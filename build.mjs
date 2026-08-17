@@ -7,8 +7,8 @@
  *
  * Deja en dist/:
  *   Droptimizer.exe   <- el programa
- *   simc/             <- carpeta donde pegan sus .simc
  *   LEEME.txt
+ *   datos/            <- todo lo demas: media, perfiles, y lo que se genere al usarlo
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -28,7 +28,9 @@ const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit' })
 fs.rmSync(BUILD, { recursive: true, force: true })
 fs.rmSync(EXE, { force: true })
 fs.mkdirSync(BUILD, { recursive: true })
-fs.mkdirSync(path.join(DIST, 'simc'), { recursive: true })
+const DATOS = path.join(DIST, 'datos')
+const MEDIA = path.join(DATOS, 'media')
+fs.mkdirSync(MEDIA, { recursive: true })
 
 // 1. Un solo fichero CommonJS con run.mjs + playwright-core dentro.
 console.log('1/4  bundling...')
@@ -124,26 +126,35 @@ await inject(EXE, 'NODE_SEA_BLOB', fs.readFileSync(path.join(BUILD, 'sea-prep.bl
 
 // 4. Extras que acompañan al .exe.
 console.log('4/4  extras...')
-fs.copyFileSync(path.join(HERE, 'profiles.json'), path.join(DIST, 'profiles.json'))
+fs.copyFileSync(path.join(HERE, 'profiles.json'), path.join(DATOS, 'profiles.json'))
 // El icono de la ventana de la interfaz grafica...
-if (logo) fs.copyFileSync(logo, path.join(DIST, 'pulpo.png'))
+if (logo) fs.copyFileSync(logo, path.join(MEDIA, 'pulpo.png'))
 // ...y todos los didop-* que haya en assets/, sean gif o video.
 const assets = path.join(HERE, 'assets')
 if (fs.existsSync(assets)) {
   const didops = fs.readdirSync(assets).filter((f) => /^didop-[\w-]+\.(gif|mp4|webm)$/i.test(f))
-  for (const f of didops) fs.copyFileSync(path.join(assets, f), path.join(DIST, f))
+  for (const f of didops) fs.copyFileSync(path.join(assets, f), path.join(MEDIA, f))
   console.log(`     ${didops.length} didop(s): ${didops.join(', ')}`)
 }
 
-// La cuenta compartida viaja como fichero al lado del .exe (no dentro del binario):
-// asi se cambia la contraseña sin recompilar nada.
+/*
+ * La cuenta puede viajar como fichero dentro de datos/ (no dentro del binario),
+ * pero NUNCA por defecto: un build normal no debe llevar credenciales, que es lo
+ * que acaba subido a una release publica. Hay que pedirlo a proposito:
+ *
+ *   node build.mjs --con-cuenta
+ */
 const account = path.join(HERE, 'raidbots-account.json')
-if (fs.existsSync(account)) {
-  fs.copyFileSync(account, path.join(DIST, 'raidbots-account.json'))
-  console.log('     cuenta de la guild incluida en dist/ (¡el zip lleva credenciales!)')
+const conCuenta = process.argv.includes('--con-cuenta')
+if (conCuenta && fs.existsSync(account)) {
+  fs.copyFileSync(account, path.join(DATOS, 'raidbots-account.json'))
+  console.log('     ¡ATENCION! la cuenta va dentro: este ZIP lleva credenciales, no lo subas a GitHub')
 } else {
-  fs.copyFileSync(path.join(HERE, 'raidbots-account.example.json'), path.join(DIST, 'raidbots-account.example.json'))
-  console.log('     sin raidbots-account.json: el .exe ira en anonimo')
+  fs.rmSync(path.join(DATOS, 'raidbots-account.json'), { force: true })
+  fs.copyFileSync(path.join(HERE, 'raidbots-account.example.json'), path.join(DATOS, 'raidbots-account.example.json'))
+  console.log(fs.existsSync(account)
+    ? '     sin credenciales (hay una cuenta guardada, pero hace falta --con-cuenta)'
+    : '     sin credenciales: cada uno entra con la suya')
 }
 fs.writeFileSync(path.join(DIST, 'LEEME.txt'), `DROPTIMIZERS DE INSANITY
 =======================
@@ -157,8 +168,22 @@ COMO SE USA
 4. Al terminar tienes las URLs como enlaces, con un boton para copiar cada una
    y otro para copiarlas todas. Tambien quedan en out\\urls.txt
 
-Detras de la ventana se queda una consola con el detalle; puedes minimizarla.
 Al cerrar la ventana se cierra el programa.
+
+QUE ES LA CARPETA datos\
+-----------------------
+Ahi va todo lo que el programa necesita y todo lo que genera, para no llenarte
+la carpeta de ficheros sueltos:
+
+  datos\media\        los gifs y el icono (cambialos si quieres)
+  datos\profiles.json que perfiles de droptimizer existen
+  datos\simc\         los SimC que vas pegando, uno por personaje y spec
+  datos\out\          los resultados: urls.txt y el detalle en JSON
+  datos\navegador\    la sesion de Raidbots (por eso no pide login cada vez)
+  datos\ventana\      datos internos de la ventana
+
+Si vienes de una version anterior, la primera vez ordena solo lo que tuvieras
+suelto: no pierdes ni la sesion ni la configuracion.
 
 Para usar la cuenta de Raidbots de la guild: boton "Cuenta" arriba a la derecha.
 Se guarda en este PC y no vuelve a preguntar. Sin cuenta tambien funciona, solo

@@ -13,7 +13,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  HERE, IS_PACKAGED, SIMC_DIR, BASE,
+  HERE, IS_PACKAGED, SIMC_DIR, OUT_DIR, DATOS, migrarEstructuraVieja, BASE,
   log, prompt, promptHidden, parseSimc, simcFileName, readClipboard, looksLikeSimc,
   loadConfig, saveConfig, loadProfiles,
   readAccount, saveAccount, launchContext, describeSession, login, logout, ensureLogin,
@@ -36,7 +36,7 @@ const has = (name) => args.includes(`--${name}`)
 const opts = {
   simc: flag('simc'),
   profiles: flag('profiles'),
-  out: flag('out', path.join(HERE, 'out')),
+  out: flag('out', OUT_DIR),
   headed: has('headed') || has('login'),
   login: has('login'),
   dryRun: has('dry-run'),
@@ -456,7 +456,7 @@ for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK']) {
  * tanda se queda a medias. Se avisa, pero no se bloquea: un cerrojo olvidado no
  * puede dejar a nadie sin poder usarlo.
  */
-const CERROJO = path.join(HERE, '.lock')
+const CERROJO = path.join(DATOS, '.lock')
 
 function otraCopiaAbierta() {
   try {
@@ -476,6 +476,7 @@ function soltarCerrojo() {
 }
 
 async function main() {
+  migrarEstructuraVieja()
   fs.mkdirSync(opts.out, { recursive: true })
 
   // Interfaz grafica: ventana propia con botones.

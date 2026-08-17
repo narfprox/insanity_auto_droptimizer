@@ -26,10 +26,53 @@ export const HERE = process.env.DROPTIMIZER_HOME
   ? path.resolve(process.env.DROPTIMIZER_HOME)
   : IS_PACKAGED ? path.dirname(process.execPath) : path.dirname(fileURLToPath(import.meta.url))
 
-export const PROFILE_DIR = path.join(HERE, '.browser-profile')
-export const SIMC_DIR = path.join(HERE, 'simc')
-export const ACCOUNT_FILE = path.join(HERE, 'raidbots-account.json')
-export const CONFIG_FILE = path.join(HERE, 'config.json')
+/*
+ * Todo lo que el programa lee o escribe vive bajo datos/, para que al
+ * descomprimir solo se vea el ejecutable y no un revoltijo de ficheros.
+ */
+export const DATOS = process.env.DROPTIMIZER_DATA
+  ? path.resolve(process.env.DROPTIMIZER_DATA)
+  : path.join(HERE, 'datos')
+
+export const MEDIA_DIR = path.join(DATOS, 'media')
+export const PROFILE_DIR = path.join(DATOS, 'navegador')
+export const UI_PROFILE_DIR = path.join(DATOS, 'ventana')
+export const SIMC_DIR = path.join(DATOS, 'simc')
+export const OUT_DIR = path.join(DATOS, 'out')
+export const ACCOUNT_FILE = path.join(DATOS, 'raidbots-account.json')
+export const WOWUTILS_FILE_PATH = path.join(DATOS, 'wowutils-account.json')
+export const CONFIG_FILE = path.join(DATOS, 'config.json')
+
+/** Donde buscar un fichero de datos: primero datos/, luego el sitio de siempre. */
+export const buscarDato = (...candidatos) => candidatos.find((f) => f && fs.existsSync(f)) || null
+
+/**
+ * Las versiones anteriores lo dejaban todo suelto junto al .exe. Al arrancar se
+ * mueve a datos/ lo que hubiera, para no perder la sesion ni la configuracion
+ * de quien viene actualizando.
+ */
+export function migrarEstructuraVieja() {
+  const mudanzas = [
+    ['.browser-profile', PROFILE_DIR],
+    ['.ui-profile', UI_PROFILE_DIR],
+    ['simc', SIMC_DIR],
+    ['out', OUT_DIR],
+    ['config.json', CONFIG_FILE],
+    ['raidbots-account.json', ACCOUNT_FILE],
+    ['wowutils-account.json', WOWUTILS_FILE_PATH],
+  ]
+  let movidos = 0
+  for (const [viejo, nuevo] of mudanzas) {
+    const origen = path.join(HERE, viejo)
+    if (!fs.existsSync(origen) || fs.existsSync(nuevo)) continue
+    try {
+      fs.mkdirSync(path.dirname(nuevo), { recursive: true })
+      fs.renameSync(origen, nuevo)
+      movidos++
+    } catch { /* si no se puede mover, se queda donde estaba */ }
+  }
+  if (movidos) log(`  (ordenados ${movidos} ficheros de la version anterior en datos/)`)
+}
 
 const CLASSES = [
   'death_knight', 'demon_hunter', 'druid', 'evoker', 'hunter', 'mage', 'monk',
@@ -150,8 +193,8 @@ export function saveConfig(config) {
 
 /** Perfiles de droptimizer: manda un profiles.json al lado del programa si existe. */
 export function loadProfiles() {
-  const file = path.join(HERE, 'profiles.json')
-  if (fs.existsSync(file)) {
+  const file = buscarDato(path.join(DATOS, 'profiles.json'), path.join(HERE, 'profiles.json'))
+  if (file) {
     try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { log('aviso: profiles.json no es valido, se usan los de fabrica') }
   }
   return DEFAULT_PROFILES
@@ -184,7 +227,7 @@ export function forgetAccount() {
 // ---------------------------------------------------------------- WoWUtils
 
 export const WOWUTILS_API = 'https://api.wowutils.com'
-export const WOWUTILS_FILE = path.join(HERE, 'wowutils-account.json')
+export const WOWUTILS_FILE = WOWUTILS_FILE_PATH
 const COST_PER_IMPORT = 5
 
 /** Key + grupo de WoWUtils: variables de entorno o wowutils-account.json. */

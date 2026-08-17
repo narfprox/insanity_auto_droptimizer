@@ -15,7 +15,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import {
-  HERE, log, readWowutils, importDroptimizers, importableFrom, latestResultsFile,
+  HERE, OUT_DIR, log, readWowutils, importDroptimizers, importableFrom, latestResultsFile,
 } from './lib.mjs'
 
 for (const dir of [HERE, path.resolve(HERE, '..'), path.resolve(HERE, '..', '..')]) {
@@ -44,7 +44,7 @@ let items
 if (typeof flag('url') === 'string') {
   items = [{ url: flag('url'), profileKey: flag('profile-key') || undefined, character: '?', label: 'manual' }]
 } else {
-  const file = typeof flag('file') === 'string' ? path.resolve(flag('file')) : latestResultsFile(path.join(HERE, 'out'))
+  const file = typeof flag('file') === 'string' ? path.resolve(flag('file')) : latestResultsFile(OUT_DIR)
   if (!file) {
     console.error('No hay resultados en out/. Lanza antes: node run.mjs')
     process.exit(1)

@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
 import {
-  HERE, SIMC_DIR, log, setLogger, parseSimc, simcFileName, looksLikeSimc,
+  HERE, DATOS, MEDIA_DIR, UI_PROFILE_DIR, OUT_DIR, SIMC_DIR, log, setLogger, parseSimc, simcFileName, looksLikeSimc,
   loadConfig, saveConfig, loadProfiles,
   launchContext, describeSession, login, logout, ensureLogin, readAccount,
   readWowutils, saveWowutils, checkWowutils, importDroptimizers, importableFrom,
@@ -30,7 +30,7 @@ let corriendo = false
 // siguen ahi despues de cerrar el programa, y se pueden subir a WoWUtils.
 let ultimosResultados = (() => {
   try {
-    const fichero = latestResultsFile(path.join(HERE, 'out'))
+    const fichero = latestResultsFile(OUT_DIR)
     return fichero ? JSON.parse(fs.readFileSync(fichero, 'utf8')) : []
   } catch { return [] }
 })()
@@ -112,7 +112,7 @@ async function lanzar({ simc, perfiles }) {
       })
     })
     ultimosResultados = resultados
-    writeResults(path.join(HERE, 'out'), resultados)
+    writeResults(OUT_DIR, resultados)
     emitir('resultados', { resultados })
     return resultados
   } finally {
@@ -123,7 +123,7 @@ async function lanzar({ simc, perfiles }) {
 }
 
 /** Donde buscar los didop: junto al .exe o en assets/ cuando se ejecuta el codigo. */
-const carpetasDidop = () => [path.join(HERE, 'assets'), HERE].filter((d) => fs.existsSync(d))
+const carpetasDidop = () => [MEDIA_DIR, path.join(HERE, 'assets')].filter((d) => fs.existsSync(d))
 
 /** Uno al azar entre todos los didop-* disponibles. */
 function elegirDidop() {
@@ -211,7 +211,7 @@ export async function arrancarUI({ puerto = 0, abrir = true } = {}) {
 
     // El icono de la ventana y de la barra de tareas: el pulpo de la guild.
     if (url.pathname === '/icono.png') {
-      const icono = [path.join(HERE, 'assets', 'pulpo.png'), path.join(HERE, 'pulpo.png')]
+      const icono = [path.join(MEDIA_DIR, 'pulpo.png'), path.join(HERE, 'assets', 'pulpo.png')]
         .find((f) => fs.existsSync(f))
       if (!icono) return res.writeHead(404).end()
       res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' })
@@ -308,7 +308,7 @@ function abrirVentana(direccion) {
 
   return spawn(exe, [
     `--app=${direccion}`,
-    `--user-data-dir=${path.join(HERE, '.ui-profile')}`, // perfil aparte: no toca tu navegador
+    `--user-data-dir=${UI_PROFILE_DIR}`, // perfil aparte: no toca tu navegador
     '--window-size=1180,860',
     '--no-first-run',
     '--no-default-browser-check',
