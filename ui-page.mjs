@@ -35,11 +35,11 @@ export const PAGINA = /* html */ `<!doctype html>
     font: 12px/1.45 Consolas, monospace;
   }
   textarea:focus, input:focus, select:focus { outline: 2px solid var(--morado2); outline-offset: -1px; }
-  .didop {
-    display: block; margin: 0 auto 12px; max-width: 100%; max-height: 150px;
-    border-radius: 8px; border: 1px solid var(--borde);
+  #didop { margin-bottom: 12px; text-align: center; }
+  #didop[hidden] { display: none; }
+  #didop img, #didop video {
+    max-width: 100%; max-height: 300px; border-radius: 8px; border: 1px solid var(--borde);
   }
-  .didop[hidden] { display: none; }
   .personaje { margin-top: 8px; font-size: 13px; color: var(--suave); min-height: 20px; }
   .personaje b { color: var(--morado); }
   label.check { display: flex; align-items: center; gap: 9px; padding: 5px 0; cursor: pointer; }
@@ -121,7 +121,7 @@ export const PAGINA = /* html */ `<!doctype html>
 
   <section class="panel">
     <h2>Progreso</h2>
-    <img class="didop" id="didop" alt="" hidden>
+    <div id="didop" hidden></div>
     <div id="consola">Listo cuando quieras.</div>
   </section>
 
@@ -288,6 +288,45 @@ $('btnGuardarWow').onclick = async () => {
   } catch (e) { alert('No vale: ' + e.message) }
 }
 
+// ---- el didop de "cargando" -------------------------------------------------
+
+// Alto de la ventana sin didop, para poder volver a el al terminar.
+let altoBase = window.outerHeight
+
+/**
+ * Ajusta la ventana a lo que ocupa el contenido: los didop no miden todos igual
+ * y si no se queda media animacion fuera o sobra un hueco enorme.
+ */
+function ajustarVentana() {
+  const sobra = document.documentElement.scrollHeight - window.innerHeight
+  if (sobra <= 0) return
+  const alto = Math.min(screen.availHeight - 40, window.outerHeight + sobra + 8)
+  try { window.resizeTo(window.outerWidth, alto) } catch (e) { /* si el navegador no deja, se queda con scroll */ }
+}
+
+async function mostrarDidop() {
+  const caja = $('didop')
+  try {
+    const elegido = await (await fetch('/api/didop')).json()
+    if (!elegido.url) return
+    caja.innerHTML = elegido.video
+      ? '<video src="' + elegido.url + '" autoplay loop muted playsinline></video>'
+      : '<img src="' + elegido.url + '" alt="">'
+    caja.hidden = false
+    const medio = caja.firstElementChild
+    const alListo = () => ajustarVentana()
+    medio.addEventListener(elegido.video ? 'loadeddata' : 'load', alListo, { once: true })
+    setTimeout(alListo, 1200) // por si el medio tarda o ya estaba cacheado
+  } catch (e) { /* sin didop no pasa nada, se sigue simulando igual */ }
+}
+
+function ocultarDidop() {
+  const caja = $('didop')
+  caja.hidden = true
+  caja.innerHTML = ''
+  try { window.resizeTo(window.outerWidth, altoBase) } catch (e) { /* da igual */ }
+}
+
 const eventos = new EventSource('/api/eventos')
 eventos.onmessage = (ev) => {
   const d = JSON.parse(ev.data)
@@ -297,11 +336,10 @@ eventos.onmessage = (ev) => {
   if (d.tipo === 'estado') {
     $('lanzar').disabled = d.corriendo
     $('lanzar').textContent = d.corriendo ? 'Simulando…' : 'Lanzar droptimizers'
-    // El gif hace de "cargando": solo mientras hay tanda, y se sortea uno nuevo
-    // en cada lanzamiento (el parametro evita que Chrome reutilice el anterior).
-    const didop = $('didop')
-    if (d.corriendo) { didop.src = '/didop.gif?' + Date.now(); didop.hidden = false }
-    else { didop.hidden = true; didop.removeAttribute('src') }
+    // El didop hace de "cargando": solo mientras hay tanda, sorteando uno nuevo
+    // en cada lanzamiento.
+    if (d.corriendo) mostrarDidop()
+    else ocultarDidop()
     if (d.corriendo && d.personaje) escribir('Lanzando ' + d.personaje)
   }
 }

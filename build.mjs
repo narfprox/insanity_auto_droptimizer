@@ -127,10 +127,12 @@ console.log('4/4  extras...')
 fs.copyFileSync(path.join(HERE, 'profiles.json'), path.join(DIST, 'profiles.json'))
 // El icono de la ventana de la interfaz grafica...
 if (logo) fs.copyFileSync(logo, path.join(DIST, 'pulpo.png'))
-// ...y los gifs que salen dentro de ella.
-for (const gif of ['didop-1.gif', 'didop-2.gif']) {
-  const origen = path.join(HERE, 'assets', gif)
-  if (fs.existsSync(origen)) fs.copyFileSync(origen, path.join(DIST, gif))
+// ...y todos los didop-* que haya en assets/, sean gif o video.
+const assets = path.join(HERE, 'assets')
+if (fs.existsSync(assets)) {
+  const didops = fs.readdirSync(assets).filter((f) => /^didop-[\w-]+\.(gif|mp4|webm)$/i.test(f))
+  for (const f of didops) fs.copyFileSync(path.join(assets, f), path.join(DIST, f))
+  console.log(`     ${didops.length} didop(s): ${didops.join(', ')}`)
 }
 
 // La cuenta compartida viaja como fichero al lado del .exe (no dentro del binario):

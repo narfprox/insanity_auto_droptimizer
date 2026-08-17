@@ -122,6 +122,23 @@ async function lanzar({ simc, perfiles }) {
   }
 }
 
+/** Donde buscar los didop: junto al .exe o en assets/ cuando se ejecuta el codigo. */
+const carpetasDidop = () => [path.join(HERE, 'assets'), HERE].filter((d) => fs.existsSync(d))
+
+/** Uno al azar entre todos los didop-* disponibles. */
+function elegirDidop() {
+  const vistos = new Map()
+  for (const carpeta of carpetasDidop()) {
+    for (const f of fs.readdirSync(carpeta)) {
+      if (/^didop-[\w-]+\.(gif|mp4|webm)$/i.test(f) && !vistos.has(f)) vistos.set(f, carpeta)
+    }
+  }
+  const nombres = [...vistos.keys()]
+  if (!nombres.length) return null
+  const nombre = nombres[Math.floor(Math.random() * nombres.length)]
+  return { nombre, video: /\.(mp4|webm)$/i.test(nombre), url: `/didop/${nombre}` }
+}
+
 // ---------------------------------------------------------------- servidor
 
 const rutas = {
@@ -201,14 +218,24 @@ export async function arrancarUI({ puerto = 0, abrir = true } = {}) {
       return res.end(fs.readFileSync(icono))
     }
 
-    // Un gif al azar en cada arranque de la ventana. Sin cachear, que si no
-    // Chrome se queda con el primero para siempre.
-    if (url.pathname === '/didop.gif') {
-      const cual = Math.random() < 0.5 ? 'didop-1.gif' : 'didop-2.gif'
-      const gif = [path.join(HERE, 'assets', cual), path.join(HERE, cual)].find((f) => fs.existsSync(f))
-      if (!gif) return res.writeHead(404).end()
-      res.writeHead(200, { 'Content-Type': 'image/gif', 'Cache-Control': 'no-store' })
-      return res.end(fs.readFileSync(gif))
+    // Uno al azar de los didop-* que haya. Se pueden añadir o quitar ficheros
+    // sin tocar el programa: se leen de la carpeta en cada lanzamiento.
+    if (url.pathname === '/api/didop') {
+      const cual = elegirDidop()
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+      return res.end(JSON.stringify(cual || {}))
+    }
+
+    if (url.pathname.startsWith('/didop/')) {
+      const nombre = path.basename(decodeURIComponent(url.pathname))
+      const fichero = carpetasDidop().map((d) => path.join(d, nombre)).find((f) => fs.existsSync(f))
+      if (!fichero || !/^didop-[\w-]+\.(gif|mp4|webm)$/i.test(nombre)) return res.writeHead(404).end()
+      res.writeHead(200, {
+        'Content-Type': nombre.endsWith('.mp4') ? 'video/mp4'
+          : nombre.endsWith('.webm') ? 'video/webm' : 'image/gif',
+        'Cache-Control': 'no-store',
+      })
+      return res.end(fs.readFileSync(fichero))
     }
 
     if (url.pathname === '/') {
