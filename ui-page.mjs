@@ -224,13 +224,22 @@ async function cargar() {
 const perfilesElegidos = () =>
   [...document.querySelectorAll('#perfiles input:checked')].map((i) => i.value)
 
+// Se le pregunta al programa que personaje es: la deteccion vive en un solo
+// sitio, no aqui y alli.
+let temporizador = null
 $('simc').addEventListener('input', () => {
-  const texto = $('simc').value
-  const clase = texto.match(/^(death_knight|demon_hunter|druid|evoker|hunter|mage|monk|paladin|priest|rogue|shaman|warlock|warrior)="?([^"\\n]+)"?/m)
-  const spec = texto.match(/^spec=(\\w+)/m)
-  $('personaje').innerHTML = clase
-    ? 'Detectado: <b>' + clase[2] + '</b> · ' + (spec ? spec[1] : '?') + ' (' + clase[1].replace('_', ' ') + ')'
-    : (texto.trim() ? '<span class="aviso">Eso no parece un export del addon SimC</span>' : '')
+  clearTimeout(temporizador)
+  temporizador = setTimeout(async () => {
+    const caja = $('personaje')
+    const texto = $('simc').value
+    if (!texto.trim()) { caja.textContent = ''; return }
+    try {
+      const p = await api('/api/detectar', { simc: texto })
+      caja.innerHTML = p.valido
+        ? 'Detectado: <b>' + p.name + '</b> · ' + (p.spec || '?') + ' (' + (p.class || '?') + ')'
+        : '<span class="aviso">Eso no parece un export del addon SimC</span>'
+    } catch (e) { caja.textContent = '' }
+  }, 250)
 })
 
 $('lanzar').onclick = async () => {

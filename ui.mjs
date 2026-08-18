@@ -149,6 +149,16 @@ const rutas = {
     return { ok: true }
   },
 
+  // La ventana no parsea el SimC por su cuenta: pregunta aqui, para que no haya
+  // dos versiones de la misma logica que se desincronizan (paso con las clases
+  // sin guion bajo: deathknight, demonhunter).
+  'POST /api/detectar': (body) => {
+    const texto = body.simc || ''
+    if (!texto.trim()) return { vacio: true }
+    const personaje = parseSimc(texto)
+    return { ...personaje, valido: looksLikeSimc(texto) }
+  },
+
   'POST /api/perfiles': (body) => {
     saveConfig({ ...loadConfig(), profiles: body.perfiles })
     return { ok: true }
