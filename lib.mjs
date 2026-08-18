@@ -74,8 +74,14 @@ export function migrarEstructuraVieja() {
   if (movidos) log(`  (ordenados ${movidos} ficheros de la version anterior en datos/)`)
 }
 
+/*
+ * Las clases tal y como las escribe el addon al principio del export:
+ *   deathknight="Gonsudk"
+ * Ojo: el addon las escribe SIN guion bajo (deathknight, demonhunter) aunque
+ * SimulationCraft por dentro use death_knight. Se aceptan las dos formas.
+ */
 const CLASSES = [
-  'death_knight', 'demon_hunter', 'druid', 'evoker', 'hunter', 'mage', 'monk',
+  'death_?knight', 'demon_?hunter', 'druid', 'evoker', 'hunter', 'mage', 'monk',
   'paladin', 'priest', 'rogue', 'shaman', 'warlock', 'warrior',
 ]
 
@@ -138,15 +144,10 @@ export function closePrompts() {
 /** Datos basicos del personaje a partir del string SimC. */
 export function parseSimc(text) {
   const line = (re) => (text.match(re) || [])[1] || null
-  let name = null
-  let klass = null
-  for (const c of CLASSES) {
-    const m = text.match(new RegExp(`^${c}="?([^"\\n]+)"?`, 'm'))
-    if (m) { klass = c; name = m[1].trim(); break }
-  }
+  const encontrado = text.match(new RegExp(`^(${CLASSES.join('|')})="?([^"\n]+)"?`, 'm'))
   return {
-    name,
-    class: klass,
+    name: encontrado ? encontrado[2].trim() : null,
+    class: encontrado ? encontrado[1].replace('_', '') : null,
     spec: line(/^spec=(\w+)/m),
     realm: line(/^server=(\S+)/m),
     region: line(/^region=(\S+)/m),
