@@ -132,6 +132,7 @@ export const PAGINA = /* html */ `<!doctype html>
     <div class="fila" style="margin-top:14px">
       <button class="sec" id="btnCopiar">Copiar todas las URLs</button>
       <button id="btnSubir">Subir a WoWUtils</button>
+      <button class="sec" id="btnBorrar" title="Vacia la lista; las URLs siguen guardadas en el fichero urls.txt">Borrar resultados</button>
     </div>
   </section>
 </main>
@@ -204,8 +205,19 @@ function pintarResultados(resultados) {
   }
 }
 
+function pintarEstado(corriendo) {
+  $('lanzar').disabled = corriendo
+  $('lanzar').textContent = corriendo ? 'Simulando…' : 'Lanzar droptimizers'
+}
+
 async function cargar() {
-  const e = await api('/api/estado')
+  let e
+  // Si esta consulta falla, la ventana se quedaba sin refrescar nada (y con el
+  // boton bloqueado). Mejor avisar y seguir.
+  try { e = await api('/api/estado') } catch (err) { escribir('No pude leer el estado: ' + err.message); return }
+  // Se pregunta si hay tanda en marcha en vez de fiarse solo de los eventos: si
+  // el stream se corta, el boton se quedaria bloqueado para siempre.
+  pintarEstado(e.corriendo)
   $('cuenta').textContent = e.sesion.texto
   $('concurrency').value = e.config.concurrency
   $('simcVersion').value = e.config.simcVersion
@@ -276,6 +288,12 @@ $('btnSubir').onclick = async () => {
   $('btnSubir').disabled = false
 }
 
+$('btnBorrar').onclick = async () => {
+  await api('/api/limpiar', {})
+  $('consola').textContent = 'Listo cuando quieras.'
+  $('consola').dataset.limpio = '0'
+}
+
 $('btnCuenta').onclick = () => $('dlgCuenta').showModal()
 $('btnWow').onclick = () => $('dlgWow').showModal()
 
@@ -338,14 +356,16 @@ function ocultarDidop() {
 }
 
 const eventos = new EventSource('/api/eventos')
+// EventSource se reconecta solo; al hacerlo puede haberse perdido el aviso de
+// fin de tanda, asi que se vuelve a preguntar el estado.
+eventos.onopen = () => cargar()
 eventos.onmessage = (ev) => {
   const d = JSON.parse(ev.data)
   if (d.tipo === 'log') escribir(d.texto)
   if (d.tipo === 'error') { escribir('ERROR: ' + d.mensaje); alert(d.mensaje) }
   if (d.tipo === 'resultados') pintarResultados(d.resultados)
   if (d.tipo === 'estado') {
-    $('lanzar').disabled = d.corriendo
-    $('lanzar').textContent = d.corriendo ? 'Simulando…' : 'Lanzar droptimizers'
+    pintarEstado(d.corriendo)
     // El didop hace de "cargando": solo mientras hay tanda, sorteando uno nuevo
     // en cada lanzamiento.
     if (d.corriendo) mostrarDidop()

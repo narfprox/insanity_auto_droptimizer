@@ -25,13 +25,25 @@ const MAX_WORKERS = 5
 
 const clientes = new Set()   // conexiones SSE abiertas
 let corriendo = false
+let corriendoDesde = 0
+
+/*
+ * Una tanda no puede durar eternamente: si el flag se quedara puesto (un fallo
+ * raro a mitad, por ejemplo) la ventana no dejaria lanzar nada mas. Pasada la
+ * espera maxima de un sim se considera zombi y se ignora.
+ */
+const TOPE_TANDA_MS = 40 * 60 * 1000
+const hayTanda = () => corriendo && (Date.now() - corriendoDesde) < TOPE_TANDA_MS
 
 // Al abrir la ventana se recupera la ultima tanda de disco: asi los enlaces
 // siguen ahi despues de cerrar el programa, y se pueden subir a WoWUtils.
 let ultimosResultados = (() => {
   try {
     const fichero = latestResultsFile(OUT_DIR)
-    return fichero ? JSON.parse(fs.readFileSync(fichero, 'utf8')) : []
+    if (!fichero) return []
+    // Si esa misma tanda ya se borro de la pantalla, no se vuelve a sacar.
+    if (loadConfig().resultadosVistosHasta === path.basename(fichero)) return []
+    return JSON.parse(fs.readFileSync(fichero, 'utf8'))
   } catch { return [] }
 })()
 
@@ -53,6 +65,20 @@ async function conNavegador(fn) {
   }
 }
 
+/*
+ * La cuenta se comprueba abriendo el navegador, y eso NO se puede hacer mientras
+ * hay una tanda: Chrome no permite dos procesos con el mismo perfil y el de la
+ * tanda se moriria a mitad. Se guarda lo ultimo que se supo y se reutiliza.
+ */
+let sesionConocida = { text: 'comprobando…', anonymous: true }
+
+async function comprobarSesion() {
+  try {
+    sesionConocida = await conNavegador(async ({ context }) => ensureLogin(context, await describeSession(context)))
+  } catch { /* si no se puede mirar ahora, se queda lo ultimo que se supo */ }
+  return sesionConocida
+}
+
 async function estado() {
   const config = loadConfig()
   const perfiles = loadProfiles()
@@ -60,7 +86,7 @@ async function estado() {
   const activos = config.profiles?.length
     ? config.profiles
     : perfiles.filter((p) => p.default !== false).map((p) => p.key)
-  const sesion = await conNavegador(async ({ context }) => ensureLogin(context, await describeSession(context)))
+  const sesion = hayTanda() ? sesionConocida : await comprobarSesion()
   return {
     sesion: { texto: sesion.text, anonima: sesion.anonymous },
     perfiles: perfiles.map((p) => ({ ...p, activo: activos.includes(p.key) })),
@@ -69,6 +95,7 @@ async function estado() {
       simcVersion: config.simcVersion || 'nightly',
     },
     wowutils: !!readWowutils(),
+    corriendo: hayTanda(),
     resultados: ultimosResultados,
     simcGuardados: fs.existsSync(SIMC_DIR)
       ? fs.readdirSync(SIMC_DIR).filter((f) => f.endsWith('.simc'))
@@ -77,7 +104,7 @@ async function estado() {
 }
 
 async function lanzar({ simc, perfiles }) {
-  if (corriendo) throw new Error('Ya hay una tanda en marcha')
+  if (hayTanda()) throw new Error('Ya hay una tanda en marcha')
   if (!looksLikeSimc(simc)) throw new Error('Eso no parece un export del addon SimC')
 
   const character = parseSimc(simc)
@@ -93,6 +120,7 @@ async function lanzar({ simc, perfiles }) {
   const workers = bruto === 'auto' ? MAX_WORKERS : Math.max(1, Number(bruto) || 1)
 
   corriendo = true
+  corriendoDesde = Date.now()
   emitir('estado', { corriendo: true, personaje: `${character.name} · ${character.spec}` })
 
   // El progreso de la libreria se manda al panel de la ventana.
@@ -157,6 +185,21 @@ const rutas = {
     if (!texto.trim()) return { vacio: true }
     const personaje = parseSimc(texto)
     return { ...personaje, valido: looksLikeSimc(texto) }
+  },
+
+  /*
+   * Borra los resultados de la pantalla. Los ficheros de out/ NO se tocan (ahi
+   * estan las URLs por si alguien las necesita luego): solo se apunta hasta que
+   * fecha estan vistos, para que no vuelvan a salir al reabrir la ventana.
+   */
+  'POST /api/limpiar': () => {
+    ultimosResultados = []
+    const fichero = latestResultsFile(OUT_DIR)
+    saveConfig({ ...loadConfig(), resultadosVistosHasta: fichero ? path.basename(fichero) : '' })
+    // Si quedo una tanda zombi, esto tambien desatasca el boton de lanzar.
+    if (!hayTanda()) { corriendo = false; emitir('estado', { corriendo: false }) }
+    emitir('resultados', { resultados: [] })
+    return { ok: true }
   },
 
   'POST /api/perfiles': (body) => {
